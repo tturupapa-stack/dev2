@@ -4,7 +4,7 @@
 
 **목표:** "리뷰의 진위여부를 가리고, 약사의 시각으로 요약한다."
 
-기획서의 8단계 광고 판별 체크리스트를 코드로 구현하고, 신뢰도 점수를 계산한 후, GPT-4o를 사용하여 약사 페르소나로 리뷰를 분석하는 역할을 담당합니다.
+기획서의 8단계 광고 판별 체크리스트를 코드로 구현하고, 신뢰도 점수를 계산한 후, **Claude API**를 사용하여 약사 페르소나로 리뷰를 분석하는 역할을 담당합니다.
 
 ---
 
@@ -20,9 +20,9 @@
 - 재구매율, 사용기간 등 메타데이터 반영
 - 최종 신뢰도 점수 계산
 
-### 3. GPT-4o 약사 페르소나 분석
+### 3. Claude API 약사 페르소나 분석
 - 약사 페르소나 프롬프트 구성
-- GPT-4o API 호출
+- Claude API 호출
 - JSON 형식 응답 파싱
 - 효능, 부작용, 권장사항 추출
 
@@ -67,8 +67,8 @@ flowchart TD
     
     Start --> AIPrep[AI 분석 준비]
     AIPrep --> PromptGen[프롬프트 생성]
-    PromptGen --> GPT4o[GPT-4o API 호출]
-    GPT4o --> ParseJSON[JSON 응답 파싱]
+    PromptGen --> Claude[Claude API 호출]
+    Claude --> ParseJSON[JSON 응답 파싱]
     ParseJSON --> Extract[효능/부작용/권장사항 추출]
     
     FinalScore --> Output[분석 결과 출력]
@@ -90,7 +90,7 @@ logic_designer/
 ├── trust_score.py           # 신뢰도 점수 계산
 │   ├── TrustScoreCalculator # 신뢰도 계산기
 │   └── TrustLevelClassifier # 신뢰도 등급 분류
-├── ai_analyzer.py           # GPT-4o 분석 모듈
+├── ai_analyzer.py           # Claude API 분석 모듈
 │   ├── PharmacistAnalyzer   # 약사 페르소나 분석기
 │   ├── PromptBuilder        # 프롬프트 빌더
 │   └── ResponseParser       # 응답 파서
@@ -108,7 +108,7 @@ logic_designer/
 ## 🔧 기술 스택
 
 - **AI/ML:**
-  - `openai` (1.3.0+): GPT-4o API 호출
+  - `anthropic`: Claude API 호출
 
 - **텍스트 분석:**
   - `re`: 정규표현식 (내장)
@@ -344,12 +344,12 @@ class PromptBuilder:
 #### `PharmacistAnalyzer`
 ```python
 class PharmacistAnalyzer:
-    """GPT-4o 약사 페르소나 분석기"""
-    
+    """Claude API 약사 페르소나 분석기"""
+
     def __init__(self, api_key: str = None):
         """
         Args:
-            api_key: OpenAI API 키 (없으면 환경변수에서 로드)
+            api_key: Anthropic API 키 (없으면 환경변수에서 로드)
         """
     
     def analyze(self, reviews: List[Dict], product_name: str) -> Dict:
@@ -372,9 +372,9 @@ class PharmacistAnalyzer:
             }
         """
     
-    def _call_gpt4o(self, prompt: str) -> str:
-        """GPT-4o API 호출"""
-    
+    def _call_claude(self, prompt: str) -> str:
+        """Claude API 호출"""
+
     def _parse_response(self, response: str) -> Dict:
         """JSON 응답 파싱"""
 ```
@@ -382,15 +382,15 @@ class PharmacistAnalyzer:
 #### `ResponseParser`
 ```python
 class ResponseParser:
-    """GPT-4o 응답 파서"""
-    
+    """Claude 응답 파서"""
+
     def parse(self, response_text: str) -> Dict:
         """
         JSON 응답 파싱
-        
+
         Args:
-            response_text: GPT-4o 응답 텍스트
-        
+            response_text: Claude 응답 텍스트
+
         Returns:
             Dict: 파싱된 분석 결과
         """
@@ -429,7 +429,7 @@ sequenceDiagram
     
     Main->>AI: 리뷰 데이터 + 제품명
     AI->>AI: 프롬프트 생성
-    AI->>AI: GPT-4o API 호출
+    AI->>AI: Claude API 호출
     AI->>AI: JSON 응답 파싱
     AI->>Main: 분석 결과 반환
     
@@ -621,31 +621,32 @@ class TrustScoreCalculator:
         return usage_count / len(reviews)
 ```
 
-### 3단계: GPT-4o 분석 구현
+### 3단계: Claude API 분석 구현
 
 ```python
 # logic_designer/ai_analyzer.py
-import openai
+import anthropic
 import json
 import os
+import re
 from typing import Dict, List
 
 class PharmacistAnalyzer:
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
-        openai.api_key = self.api_key
-    
+        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
+        self.client = anthropic.Anthropic(api_key=self.api_key)
+
     def analyze(self, reviews: List[Dict], product_name: str) -> Dict:
         """약사 페르소나로 리뷰 분석"""
         prompt = self._build_prompt(reviews, product_name)
-        response = self._call_gpt4o(prompt)
+        response = self._call_claude(prompt)
         return self._parse_response(response)
-    
+
     def _build_prompt(self, reviews: List[Dict], product_name: str) -> str:
         """프롬프트 생성"""
         reviews_text = self._format_reviews(reviews)
-        
-        prompt = f"""당신은 20년 경력의 전문 약사입니다. 
+
+        prompt = f"""당신은 20년 경력의 전문 약사입니다.
 다음 제품의 리뷰를 분석하여 의학적 관점에서 평가해주세요.
 
 제품명: {product_name}
@@ -670,20 +671,19 @@ class PharmacistAnalyzer:
 4. 특정 환자군에 대한 주의사항
 """
         return prompt
-    
-    def _call_gpt4o(self, prompt: str) -> str:
-        """GPT-4o API 호출"""
-        response = openai.ChatCompletion.create(
-            model="gpt-4o",
+
+    def _call_claude(self, prompt: str) -> str:
+        """Claude API 호출"""
+        message = self.client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            system="당신은 전문 약사입니다.",
             messages=[
-                {"role": "system", "content": "당신은 전문 약사입니다."},
                 {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2000
+            ]
         )
-        return response.choices[0].message.content
-    
+        return message.content[0].text
+
     def _parse_response(self, response: str) -> Dict:
         """JSON 응답 파싱"""
         try:
@@ -747,8 +747,8 @@ PHARMACIST_PROMPT_TEMPLATE = """
 - **가중치 조정:** 각 단계의 중요도에 따라 가중치 설정
 - **임계값 튜닝:** 실제 데이터로 테스트하여 임계값 조정
 
-### 2. GPT-4o API 사용
-- **API 키 보안:** 환경 변수로 관리, 코드에 하드코딩 금지
+### 2. Claude API 사용
+- **API 키 보안:** 환경 변수로 관리 (ANTHROPIC_API_KEY), 코드에 하드코딩 금지
 - **비용 관리:** 토큰 사용량 모니터링
 - **에러 핸들링:** API 호출 실패 시 재시도 로직
 - **응답 검증:** JSON 파싱 실패 대비
@@ -793,8 +793,9 @@ def test_trust_calculation():
 
 ## 📚 참고 자료
 
-- [OpenAI API 문서](https://platform.openai.com/docs/api-reference)
-- [GPT-4o 가이드](https://platform.openai.com/docs/guides/gpt)
+- [Anthropic Claude API 문서](https://docs.anthropic.com/claude/reference)
+- [Claude Messages API 가이드](https://docs.anthropic.com/claude/docs/messages-api)
+- [Python anthropic SDK](https://github.com/anthropics/anthropic-sdk-python)
 - 정규표현식: [Python re 모듈](https://docs.python.org/3/library/re.html)
 
 ---
@@ -807,7 +808,7 @@ def test_trust_calculation():
 - [ ] TrustScoreCalculator 구현
 - [ ] 신뢰도 공식 구현 (기획서 반영)
 - [ ] PharmacistAnalyzer 구현
-- [ ] GPT-4o API 연동
+- [ ] Claude API 연동
 - [ ] 프롬프트 템플릿 작성
 - [ ] JSON 응답 파싱 구현
 - [ ] 에러 핸들링 추가

@@ -4,19 +4,19 @@
 
 **목표:** "결과물을 멋진 웹 대시보드로 보여준다."
 
-팀원 A(데이터 수집)와 팀원 B(로직 설계 및 AI 분석)가 만든 기능을 연결하여 하나의 Streamlit 웹 서비스로 통합하고, 게이지 차트, 파이 차트 등을 활용해 신뢰도를 시각화하는 역할을 담당합니다.
+Supabase에 저장된 루테인 제품 데이터를 조회하고, 팀원 B(로직 설계 및 AI 분석)가 만든 분석 기능을 연결하여 하나의 Streamlit 웹 서비스로 통합하고, 게이지 차트, 파이 차트 등을 활용해 신뢰도를 시각화하는 역할을 담당합니다.
 
 ---
 
 ## 🎯 상세 미션
 
-### 1. 팀원 A, B 기능 통합
-- 데이터 수집 모듈 연결
+### 1. Supabase 연동 및 팀원 B 기능 통합
+- Supabase에서 제품/리뷰 데이터 조회
 - 로직 분석 모듈 연결
 - 전체 워크플로우 구현
 
 ### 2. Streamlit 웹 서비스 구현
-- 사이드바: URL 입력, 설정 옵션
+- 사이드바: **검색창**, 제품 선택, 설정 옵션
 - 메인 화면: 분석 결과 표시
 - 3종 비교 기능
 
@@ -33,44 +33,39 @@
 ```mermaid
 flowchart TD
     Start[사용자 접속] --> Streamlit[Streamlit 앱 시작]
-    
+
     Streamlit --> Sidebar[사이드바 렌더링]
-    Sidebar --> Input[URL 입력 받기]
+    Sidebar --> Search[검색창 입력]
     Sidebar --> Settings[설정 옵션]
-    
-    Input --> Validate{URL 유효성 검사}
-    Validate -->|유효| Trigger[분석 시작 버튼]
-    Validate -->|무효| Error[에러 메시지]
-    
-    Trigger --> Workflow[워크플로우 실행]
-    
-    Workflow --> TeamA[팀원 A 모듈 호출]
-    TeamA --> Scrape[리뷰 수집]
-    Scrape --> Clean[데이터 정제]
-    Clean --> CSV[CSV 저장]
-    
-    CSV --> TeamB[팀원 B 모듈 호출]
+
+    Search --> Query[Supabase 제품 검색]
+    Query --> ProductList[제품 목록 표시]
+    ProductList --> Select[제품 선택 - 최대 3개]
+
+    Select --> Trigger[분석 시작 버튼]
+
+    Trigger --> FetchReviews[Supabase에서 리뷰 조회]
+
+    FetchReviews --> TeamB[팀원 B 모듈 호출]
     TeamB --> Checklist[체크리스트 분석]
     Checklist --> Trust[신뢰도 계산]
-    Trust --> AI[GPT-4o 분석]
-    
+    Trust --> AI[Claude API 분석]
+
     AI --> Results[결과 데이터]
-    
+
     Results --> Visualize[시각화 생성]
     Visualize --> Gauge[게이지 차트]
     Visualize --> Pie[파이 차트]
     Visualize --> Radar[레이더 차트]
     Visualize --> Bar[바 차트]
-    
+
     Gauge --> MainUI[메인 UI 렌더링]
     Pie --> MainUI
     Radar --> MainUI
     Bar --> MainUI
-    
+
     MainUI --> Display[결과 표시]
     Display --> End[완료]
-    
-    Error --> End
 ```
 
 ---
@@ -82,9 +77,13 @@ ui_integration/
 ├── __init__.py              # 패키지 초기화
 ├── app.py                   # Streamlit 메인 앱
 │   ├── main()              # 메인 함수
-│   ├── render_sidebar()    # 사이드바 렌더링
+│   ├── render_sidebar()    # 사이드바 렌더링 (검색창 포함)
 │   ├── render_main()       # 메인 화면 렌더링
 │   └── run_analysis()      # 분석 실행 함수
+├── db_client.py             # Supabase 조회 클라이언트
+│   ├── get_all_products()   # 전체 제품 조회
+│   ├── search_products()    # 제품 검색
+│   └── get_reviews()        # 제품별 리뷰 조회
 ├── components.py            # 재사용 가능한 UI 컴포넌트
 │   ├── render_trust_gauge() # 신뢰도 게이지
 │   ├── render_product_card() # 제품 카드
@@ -109,6 +108,9 @@ ui_integration/
 - **웹 프레임워크:**
   - `streamlit` (1.28.0+): 웹 앱 프레임워크
 
+- **데이터베이스:**
+  - `supabase` (2.0.0+): Supabase Python 클라이언트
+
 - **시각화:**
   - `plotly` (5.17.0+): 인터랙티브 차트
   - `matplotlib` (3.7.0+): 기본 차트 (선택)
@@ -117,6 +119,7 @@ ui_integration/
   - `pandas` (2.0.0+): 데이터 조작
 
 - **기타:**
+  - `python-dotenv` (1.0.0+): 환경 변수 관리
   - `streamlit-option-menu`: 메뉴 컴포넌트 (선택)
   - `streamlit-aggrid`: 고급 테이블 (선택)
 
@@ -124,7 +127,87 @@ ui_integration/
 
 ## 📝 주요 함수 설계
 
-### 1. `app.py`
+### 1. `db_client.py` (Supabase 조회 클라이언트)
+
+```python
+# ui_integration/db_client.py
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+from typing import List, Dict, Optional
+
+load_dotenv()
+
+class DBClient:
+    """Supabase 조회 클라이언트"""
+
+    def __init__(self):
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        self.client: Client = create_client(url, key)
+
+    def get_all_products(self) -> List[Dict]:
+        """전체 제품 목록 조회"""
+        response = self.client.table('products').select('*').execute()
+        return response.data
+
+    def search_products(self, keyword: str) -> List[Dict]:
+        """
+        제품 검색 (이름 기준)
+
+        Args:
+            keyword: 검색 키워드
+
+        Returns:
+            List[Dict]: 검색된 제품 목록
+        """
+        if not keyword.strip():
+            return self.get_all_products()
+
+        response = self.client.table('products')\
+            .select('*')\
+            .ilike('name', f'%{keyword}%')\
+            .execute()
+        return response.data
+
+    def get_reviews_by_product(self, product_id: str) -> List[Dict]:
+        """
+        제품별 리뷰 조회
+
+        Args:
+            product_id: 제품 UUID
+
+        Returns:
+            List[Dict]: 리뷰 목록
+        """
+        response = self.client.table('reviews')\
+            .select('*')\
+            .eq('product_id', product_id)\
+            .execute()
+        return response.data
+
+    def get_product_with_reviews(self, product_id: str) -> Dict:
+        """
+        제품 정보와 리뷰를 함께 조회
+
+        Returns:
+            Dict: {'product': {...}, 'reviews': [...]}
+        """
+        product = self.client.table('products')\
+            .select('*')\
+            .eq('id', product_id)\
+            .single()\
+            .execute()
+
+        reviews = self.get_reviews_by_product(product_id)
+
+        return {
+            'product': product.data,
+            'reviews': reviews
+        }
+```
+
+### 2. `app.py`
 
 #### `main()`
 ```python
@@ -135,10 +218,10 @@ def main():
         page_icon="🔍",
         layout="wide"
     )
-    
+
     # 사이드바 렌더링
     sidebar_data = render_sidebar()
-    
+
     # 메인 화면 렌더링
     if sidebar_data.get('analyze_clicked'):
         run_analysis(sidebar_data)
@@ -150,52 +233,67 @@ def main():
 ```python
 def render_sidebar() -> Dict:
     """
-    사이드바 렌더링
-    
+    사이드바 렌더링 (검색창 기반)
+
     Returns:
         Dict: 사용자 입력 데이터
         {
-            'urls': [url1, url2, url3],
-            'max_reviews': 50,
+            'selected_products': [product1, product2, ...],
             'filter_ads': True,
             'analyze_clicked': bool
         }
     """
+    from ui_integration.db_client import DBClient
+
+    db = DBClient()
+
     with st.sidebar:
         st.title("🔍 분석 설정")
-        
-        # URL 입력 (3개)
-        urls = []
-        for i in range(3):
-            url = st.text_input(
-                f"제품 {i+1} URL",
-                key=f"url_{i}",
-                placeholder="https://shopping.naver.com/..."
-            )
-            urls.append(url)
-        
-        # 리뷰 개수 설정
-        max_reviews = st.slider(
-            "제품당 분석할 리뷰 개수",
-            min_value=10,
-            max_value=100,
-            value=50,
-            step=10
+
+        # 검색창
+        search_keyword = st.text_input(
+            "제품 검색",
+            placeholder="루테인 검색...",
+            help="제품명으로 검색하세요"
         )
-        
+
+        # 제품 검색 및 목록 표시
+        products = db.search_products(search_keyword)
+
+        if not products:
+            st.warning("등록된 제품이 없습니다.")
+            return {'analyze_clicked': False}
+
+        # 제품 선택 (멀티셀렉트)
+        product_options = {p['name']: p for p in products}
+        selected_names = st.multiselect(
+            "분석할 제품 선택 (최대 3개)",
+            options=list(product_options.keys()),
+            max_selections=3,
+            help="비교 분석하려면 2-3개 선택"
+        )
+
+        selected_products = [product_options[name] for name in selected_names]
+
+        st.divider()
+
         # 필터 옵션
-        filter_ads = st.checkbox("광고 의심 리뷰 자동 필터링", value=True)
-        
+        filter_ads = st.checkbox("광고 의심 리뷰 하이라이트", value=True)
+
         # 분석 시작 버튼
         analyze_clicked = st.button(
-            "분석 시작",
+            "🔬 분석 시작",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=len(selected_products) == 0
         )
-        
+
+        # 선택된 제품 수 표시
+        if selected_products:
+            st.caption(f"✅ {len(selected_products)}개 제품 선택됨")
+
         return {
-            'urls': urls,
-            'max_reviews': max_reviews,
+            'selected_products': selected_products,
             'filter_ads': filter_ads,
             'analyze_clicked': analyze_clicked
         }
@@ -206,47 +304,76 @@ def render_sidebar() -> Dict:
 def run_analysis(sidebar_data: Dict):
     """
     분석 실행 및 결과 표시
-    
+
     Args:
         sidebar_data: 사이드바에서 받은 입력 데이터
     """
-    urls = [url for url in sidebar_data['urls'] if url]
-    
-    if not urls:
-        st.error("최소 1개 이상의 URL을 입력해주세요.")
+    from ui_integration.db_client import DBClient
+    from logic_designer.checklist import AdPatternChecker
+    from logic_designer.trust_score import TrustScoreCalculator
+    from logic_designer.ai_analyzer import PharmacistAnalyzer
+
+    selected_products = sidebar_data.get('selected_products', [])
+
+    if not selected_products:
+        st.error("최소 1개 이상의 제품을 선택해주세요.")
         return
-    
+
+    db = DBClient()
+
     # 진행 상황 표시
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
+
     results = []
-    
-    for idx, url in enumerate(urls):
-        status_text.text(f"제품 {idx+1} 분석 중... ({idx+1}/{len(urls)})")
-        
-        # 팀원 A: 데이터 수집
-        progress_bar.progress((idx * 3 + 1) / (len(urls) * 3))
-        reviews = collect_reviews(url, sidebar_data['max_reviews'])
-        
-        # 팀원 B: 분석
-        progress_bar.progress((idx * 3 + 2) / (len(urls) * 3))
-        analysis_result = analyze_reviews(reviews, url)
-        
-        results.append(analysis_result)
-        progress_bar.progress((idx * 3 + 3) / (len(urls) * 3))
-    
+
+    for idx, product in enumerate(selected_products):
+        product_name = product['name']
+        status_text.info(f"📦 {product_name} 분석 중... ({idx+1}/{len(selected_products)})")
+
+        # Supabase에서 리뷰 조회
+        progress_bar.progress((idx * 3 + 1) / (len(selected_products) * 3))
+        reviews = db.get_reviews_by_product(product['id'])
+
+        if not reviews:
+            st.warning(f"{product_name}: 리뷰가 없습니다.")
+            continue
+
+        # 팀원 B: 체크리스트 분석
+        progress_bar.progress((idx * 3 + 2) / (len(selected_products) * 3))
+
+        checker = AdPatternChecker()
+        checklist_results = [checker.check_all_patterns(r) for r in reviews]
+
+        # 신뢰도 계산
+        trust_calc = TrustScoreCalculator()
+        trust_result = trust_calc.calculate(reviews, checklist_results)
+
+        # AI 분석
+        progress_bar.progress((idx * 3 + 3) / (len(selected_products) * 3))
+        analyzer = PharmacistAnalyzer()
+        ai_result = analyzer.analyze(reviews, product)
+
+        results.append({
+            'product': product,
+            'reviews': reviews,
+            'trust_score': trust_result['score'],
+            'trust_level': trust_result['level'],
+            'checklist_results': checklist_results,
+            'ai_result': ai_result
+        })
+
     # 결과 표시
-    status_text.text("분석 완료!")
-    progress_bar.empty()
-    
+    progress_bar.progress(1.0)
+    status_text.success("✅ 분석 완료!")
+
     if len(results) == 1:
         render_single_result(results[0])
     else:
         render_comparison_results(results)
 ```
 
-### 2. `components.py`
+### 3. `components.py`
 
 #### `render_trust_gauge()`
 ```python
@@ -505,31 +632,33 @@ def create_bar_chart(data: Dict, title: str = "") -> go.Figure:
 sequenceDiagram
     participant User as 사용자
     participant UI as Streamlit UI
-    participant TeamA as 팀원 A 모듈
+    participant Supabase as Supabase DB
     participant TeamB as 팀원 B 모듈
+    participant Claude as Claude API
     participant Viz as 시각화 모듈
-    
-    User->>UI: URL 입력 및 설정
+
+    User->>UI: 제품 검색
+    UI->>Supabase: 제품 목록 조회
+    Supabase->>UI: 검색 결과 반환
+    User->>UI: 제품 선택 (최대 3개)
     User->>UI: 분석 시작 버튼 클릭
-    
-    UI->>UI: 입력 검증
-    UI->>TeamA: 리뷰 수집 요청
-    TeamA->>TeamA: 웹 스크래핑
-    TeamA->>TeamA: 데이터 정제
-    TeamA->>UI: 리뷰 데이터 반환
-    
+
+    UI->>Supabase: 선택된 제품 리뷰 조회
+    Supabase->>UI: 리뷰 데이터 반환
+
     UI->>TeamB: 분석 요청
     TeamB->>TeamB: 체크리스트 분석
     TeamB->>TeamB: 신뢰도 계산
-    TeamB->>TeamB: GPT-4o 분석
+    TeamB->>Claude: 약사 페르소나 분석 요청
+    Claude->>TeamB: JSON 분석 결과
     TeamB->>UI: 분석 결과 반환
-    
+
     UI->>Viz: 시각화 생성 요청
     Viz->>Viz: 게이지 차트 생성
     Viz->>Viz: 파이 차트 생성
     Viz->>Viz: 레이더 차트 생성
     Viz->>UI: 차트 반환
-    
+
     UI->>User: 결과 표시
 ```
 
@@ -545,21 +674,21 @@ sequenceDiagram
 │                  │                              │
 │  🔍 분석 설정     │  📊 분석 결과                 │
 │                  │                              │
-│  URL 입력        │  ┌────────────────────────┐  │
-│  [URL 1]        │  │  제품 카드 (3개)        │  │
-│  [URL 2]        │  │  [게이지] [게이지] [게이지]│  │
-│  [URL 3]        │  └────────────────────────┘  │
-│                  │                              │
-│  리뷰 개수       │  ┌────────────────────────┐  │
-│  [슬라이더]      │  │  비교 테이블            │  │
+│  제품 검색       │  ┌────────────────────────┐  │
+│  [검색창    🔍]  │  │  제품 카드 (3개)        │  │
+│                  │  │  [게이지] [게이지] [게이지]│  │
+│  제품 선택       │  └────────────────────────┘  │
+│  ☑ NOW Foods    │                              │
+│  ☑ Doctor's Best│  ┌────────────────────────┐  │
+│  ☐ Jarrow       │  │  비교 테이블            │  │
 │                  │  └────────────────────────┘  │
-│  필터 옵션       │                              │
-│  [체크박스]      │  ┌────────────────────────┐  │
-│                  │  │  약사 인사이트          │  │
-│  [분석 시작]     │  └────────────────────────┘  │
-│                  │                              │
+│  ──────────     │                              │
+│  필터 옵션       │  ┌────────────────────────┐  │
+│  [체크박스]      │  │  약사 인사이트          │  │
+│                  │  └────────────────────────┘  │
+│  [🔬 분석 시작]  │                              │
 │                  │  ┌────────────────────────┐  │
-│                  │  │  레이더 차트            │  │
+│  ✅ 2개 제품 선택│  │  레이더 차트            │  │
 │                  │  └────────────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
@@ -579,8 +708,7 @@ import os
 # 상위 디렉토리 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data_manager.scraper import create_scraper
-from data_manager.data_cleaner import save_to_csv
+from ui_integration.db_client import DBClient
 from logic_designer.checklist import AdPatternChecker
 from logic_designer.trust_score import TrustScoreCalculator
 from logic_designer.ai_analyzer import PharmacistAnalyzer
@@ -592,7 +720,7 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+
     # 커스텀 CSS
     st.markdown("""
     <style>
@@ -604,13 +732,34 @@ def main():
     }
     </style>
     """, unsafe_allow_html=True)
-    
+
     sidebar_data = render_sidebar()
-    
+
     if sidebar_data.get('analyze_clicked'):
         run_analysis(sidebar_data)
     else:
         render_welcome_screen()
+
+
+def render_welcome_screen():
+    """환영 화면 렌더링"""
+    st.title("🔍 건기식 리뷰 팩트체크")
+    st.markdown("### 루테인 제품 리뷰 분석 시스템")
+    st.info("👈 사이드바에서 제품을 검색하고 선택한 후 분석을 시작하세요.")
+
+    # 데이터베이스 상태 표시
+    db = DBClient()
+    products = db.get_all_products()
+
+    st.markdown("---")
+    st.markdown("#### 📦 등록된 제품")
+
+    if products:
+        for product in products:
+            st.markdown(f"- **{product['name']}** ({product['brand']})")
+    else:
+        st.warning("등록된 제품이 없습니다. 팀원 A에게 데이터 업로드를 요청하세요.")
+
 
 if __name__ == "__main__":
     main()
@@ -620,89 +769,81 @@ if __name__ == "__main__":
 
 ```python
 def run_analysis(sidebar_data: Dict):
-    """분석 실행"""
-    urls = [url for url in sidebar_data['urls'] if url.strip()]
-    
-    if not urls:
-        st.error("❌ 최소 1개 이상의 URL을 입력해주세요.")
+    """분석 실행 (Supabase 기반)"""
+    from ui_integration.db_client import DBClient
+
+    selected_products = sidebar_data.get('selected_products', [])
+
+    if not selected_products:
+        st.error("❌ 최소 1개 이상의 제품을 선택해주세요.")
         return
-    
+
+    db = DBClient()
+
     # 진행 상황 표시
     progress_container = st.container()
     with progress_container:
         progress_bar = st.progress(0)
         status_text = st.empty()
-    
+
     results = []
-    
+
     try:
-        for idx, url in enumerate(urls):
-            status_text.info(f"📦 제품 {idx+1} 분석 중... ({idx+1}/{len(urls)})")
-            
-            # 팀원 A: 데이터 수집
-            progress = (idx * 4 + 1) / (len(urls) * 4)
+        for idx, product in enumerate(selected_products):
+            product_name = product['name']
+            status_text.info(f"📦 {product_name} 분석 중... ({idx+1}/{len(selected_products)})")
+
+            # Supabase에서 리뷰 조회
+            progress = (idx * 3 + 1) / (len(selected_products) * 3)
             progress_bar.progress(progress)
-            
-            with st.spinner("리뷰 수집 중..."):
-                scraper = create_scraper(url, sidebar_data['max_reviews'])
-                reviews = scraper.scrape()
-            
+
+            with st.spinner("리뷰 조회 중..."):
+                reviews = db.get_reviews_by_product(product['id'])
+
             if not reviews:
-                st.warning(f"제품 {idx+1}: 리뷰를 수집할 수 없습니다.")
+                st.warning(f"{product_name}: 리뷰가 없습니다.")
                 continue
-            
+
             # 팀원 B: 체크리스트 분석
-            progress = (idx * 4 + 2) / (len(urls) * 4)
+            progress = (idx * 3 + 2) / (len(selected_products) * 3)
             progress_bar.progress(progress)
-            
+
             with st.spinner("광고 패턴 분석 중..."):
                 checker = AdPatternChecker()
-                checklist_results = []
-                for review in reviews:
-                    check_result = checker.check_all_patterns(review)
-                    checklist_results.append(check_result)
-            
-            # 팀원 B: 신뢰도 계산
-            progress = (idx * 4 + 3) / (len(urls) * 4)
-            progress_bar.progress(progress)
-            
+                checklist_results = [checker.check_all_patterns(r) for r in reviews]
+
             with st.spinner("신뢰도 계산 중..."):
-                from logic_designer.checklist import ChecklistScorer
-                scorer = ChecklistScorer()
-                checklist_score = scorer.calculate(checklist_results[0])
-                
                 trust_calc = TrustScoreCalculator()
-                trust_score = trust_calc.calculate(reviews, checklist_score)
-                trust_level = TrustLevelClassifier().classify(trust_score)
-            
+                trust_result = trust_calc.calculate(reviews, checklist_results)
+
             # 팀원 B: AI 분석
-            progress = (idx * 4 + 4) / (len(urls) * 4)
+            progress = (idx * 3 + 3) / (len(selected_products) * 3)
             progress_bar.progress(progress)
-            
+
             with st.spinner("AI 약사 분석 중..."):
                 analyzer = PharmacistAnalyzer()
-                ai_result = analyzer.analyze(reviews, f"제품 {idx+1}")
-            
+                ai_result = analyzer.analyze(reviews, product)
+
             # 결과 저장
             results.append({
-                'url': url,
+                'product': product,
                 'reviews': reviews,
-                'trust_score': trust_score,
-                'trust_level': trust_level,
+                'trust_score': trust_result['score'],
+                'trust_level': trust_result['level'],
                 'checklist_results': checklist_results,
                 'ai_result': ai_result
             })
-        
+
         # 진행 상황 완료
         progress_bar.progress(1.0)
         status_text.success("✅ 분석 완료!")
-        
+
         # 결과 표시
         if len(results) == 1:
             render_single_result(results[0])
         else:
             render_comparison_results(results)
-    
+
     except Exception as e:
         st.error(f"❌ 오류 발생: {str(e)}")
         st.exception(e)
@@ -713,51 +854,58 @@ def run_analysis(sidebar_data: Dict):
 ```python
 def render_single_result(result: Dict):
     """단일 제품 결과 표시"""
-    st.header("📊 분석 결과")
-    
+    product = result['product']
+
+    st.header(f"📊 {product['name']} 분석 결과")
+
     # 제품 카드
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         render_product_card({
-            'name': '제품명',
+            'name': product['name'],
+            'brand': product['brand'],
             'trust_score': result['trust_score'],
             'trust_level': result['trust_level'],
             'review_count': len(result['reviews'])
         })
-    
+
     # 상세 비교 테이블
     st.subheader("📋 상세 분석")
     render_comparison_table([result])
-    
+
     # 약사 인사이트
     st.subheader("💊 AI 약사의 인사이트")
     render_pharmacist_insight(result['ai_result'])
 
+
 def render_comparison_results(results: List[Dict]):
     """3종 비교 결과 표시"""
-    st.header("🔍 3종 비교 분석 리포트")
-    
-    # 제품 카드 3개
-    cols = st.columns(3)
+    st.header("🔍 루테인 제품 비교 분석 리포트")
+
+    # 제품 카드
+    cols = st.columns(len(results))
     for idx, (col, result) in enumerate(zip(cols, results)):
+        product = result['product']
         with col:
             render_product_card({
-                'name': f'제품 {idx+1}',
+                'name': product['name'],
+                'brand': product['brand'],
                 'trust_score': result['trust_score'],
                 'trust_level': result['trust_level'],
                 'review_count': len(result['reviews'])
             })
-    
+
     # 비교 테이블
     st.subheader("📋 팩트체크 상세 비교")
     render_comparison_table(results)
-    
+
     # 약사 인사이트
     st.subheader("💊 AI 약사의 심층 비교 리포트")
-    for idx, result in enumerate(results):
-        with st.expander(f"제품 {idx+1} 상세 분석"):
+    for result in results:
+        product = result['product']
+        with st.expander(f"{product['name']} ({product['brand']}) 상세 분석"):
             render_pharmacist_insight(result['ai_result'])
-    
+
     # 레이더 차트
     st.subheader("📊 신뢰도-효능-가격 비교")
     radar_fig = create_radar_chart(results)
@@ -867,9 +1015,11 @@ def test_gauge_chart():
 ## ✅ 체크리스트
 
 - [ ] Streamlit 기본 앱 구조 구현
-- [ ] 사이드바 UI 구현
+- [ ] db_client.py 구현 (Supabase 조회)
+- [ ] 검색창 UI 구현
+- [ ] 제품 선택 (멀티셀렉트) 구현
 - [ ] 메인 화면 레이아웃 구현
-- [ ] 팀원 A 모듈 통합
+- [ ] Supabase 연동 테스트
 - [ ] 팀원 B 모듈 통합
 - [ ] 게이지 차트 구현
 - [ ] 파이 차트 구현
@@ -898,19 +1048,20 @@ streamlit run ui_integration/app.py --server.port 8501
 
 ## 📌 통합 체크리스트
 
-### 팀원 A 모듈 연동
-- [ ] `data_manager` 패키지 import 확인
-- [ ] `collect_reviews()` 함수 호출 테스트
-- [ ] CSV 파일 저장 경로 확인
+### Supabase 연동
+- [ ] 환경 변수 설정 (SUPABASE_URL, SUPABASE_KEY)
+- [ ] `DBClient` 연결 테스트
+- [ ] 제품 목록 조회 테스트
+- [ ] 리뷰 조회 테스트
 
 ### 팀원 B 모듈 연동
 - [ ] `logic_designer` 패키지 import 확인
 - [ ] `AdPatternChecker` 사용 테스트
 - [ ] `TrustScoreCalculator` 사용 테스트
-- [ ] `PharmacistAnalyzer` API 키 설정 확인
+- [ ] `PharmacistAnalyzer` API 키 설정 확인 (ANTHROPIC_API_KEY)
 
 ### 전체 워크플로우
-- [ ] URL 입력 → 리뷰 수집 → 분석 → 시각화 전체 플로우 테스트
+- [ ] 검색 → 제품 선택 → 분석 → 시각화 전체 플로우 테스트
 - [ ] 에러 발생 시 적절한 메시지 표시
 - [ ] 진행 상황 표시 정확성 확인
 
