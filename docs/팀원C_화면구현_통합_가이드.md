@@ -74,31 +74,26 @@ flowchart TD
 
 ```
 ui_integration/
-├── __init__.py              # 패키지 초기화
-├── app.py                   # Streamlit 메인 앱
-│   ├── main()              # 메인 함수
-│   ├── render_sidebar()    # 사이드바 렌더링 (검색창 포함)
-│   ├── render_main()       # 메인 화면 렌더링
-│   └── run_analysis()      # 분석 실행 함수
-├── db_client.py             # Supabase 조회 클라이언트
-│   ├── get_all_products()   # 전체 제품 조회
-│   ├── search_products()    # 제품 검색
-│   └── get_reviews()        # 제품별 리뷰 조회
-├── components.py            # 재사용 가능한 UI 컴포넌트
-│   ├── render_trust_gauge() # 신뢰도 게이지
-│   ├── render_product_card() # 제품 카드
-│   ├── render_comparison_table() # 비교 테이블
-│   └── render_pharmacist_insight() # 약사 인사이트
-├── visualizations.py        # 차트 및 시각화 함수
-│   ├── create_gauge_chart() # 게이지 차트
-│   ├── create_pie_chart()   # 파이 차트
-│   ├── create_radar_chart() # 레이더 차트
-│   ├── create_bar_chart()   # 바 차트
-│   └── create_comparison_chart() # 비교 차트
-└── utils.py                 # UI 유틸리티
-    ├── format_number()      # 숫자 포맷팅
-    ├── get_color_by_level() # 신뢰도별 색상
-    └── validate_inputs()    # 입력 검증
+├── app.py              # Streamlit 메인 앱 (390줄)
+│   ├── main()         # 메인 함수
+│   ├── CSS 스타일     # 커스텀 CSS 정의
+│   └── 섹션별 렌더링  # 제품카드, 비교표, 차트, 리뷰 표시
+├── mock_data.py        # 목업 데이터 생성 (323줄)
+│   ├── PRODUCTS        # 루테인 제품 5종
+│   ├── generate_reviews_for_product()  # 리뷰 생성
+│   ├── generate_checklist_results()    # 체크리스트
+│   ├── generate_ai_analysis()          # AI 분석 결과
+│   └── 데이터 접근 함수 # get_all_products, search_products 등
+├── visualizations.py   # 시각화 컴포넌트 (355줄)
+│   ├── render_gauge_chart()            # 신뢰도 게이지
+│   ├── render_trust_badge()            # 신뢰도 배지
+│   ├── render_comparison_table()       # 비교 테이블
+│   ├── render_radar_chart()            # 레이더 차트
+│   ├── render_review_sentiment_chart() # 평점 분포 차트
+│   ├── render_checklist_visual()       # 체크리스트 시각화
+│   └── render_price_comparison_chart() # 가격 비교 차트
+├── requirements.txt    # 의존성: streamlit, plotly, pandas
+└── README.md          # 설치/실행 가이드
 ```
 
 ---
@@ -106,521 +101,450 @@ ui_integration/
 ## 🔧 기술 스택
 
 - **웹 프레임워크:**
-  - `streamlit` (1.28.0+): 웹 앱 프레임워크
-
-- **데이터베이스:**
-  - `supabase` (2.0.0+): Supabase Python 클라이언트
+  - `streamlit` (1.31.0+): 웹 앱 프레임워크
 
 - **시각화:**
-  - `plotly` (5.17.0+): 인터랙티브 차트
-  - `matplotlib` (3.7.0+): 기본 차트 (선택)
+  - `plotly` (5.18.0+): 인터랙티브 차트
 
 - **데이터 처리:**
-  - `pandas` (2.0.0+): 데이터 조작
-
-- **기타:**
-  - `python-dotenv` (1.0.0+): 환경 변수 관리
-  - `streamlit-option-menu`: 메뉴 컴포넌트 (선택)
-  - `streamlit-aggrid`: 고급 테이블 (선택)
+  - `pandas` (2.1.0+): 데이터 조작 및 테이블 렌더링
 
 ---
 
 ## 📝 주요 함수 설계
 
-### 1. `db_client.py` (Supabase 조회 클라이언트)
+### 1. `mock_data.py` (목업 데이터 관리)
 
 ```python
-# ui_integration/db_client.py
-import os
-from supabase import create_client, Client
-from dotenv import load_dotenv
-from typing import List, Dict, Optional
+# ui_integration/mock_data.py
 
-load_dotenv()
+# 루테인 제품 5종 정의
+PRODUCTS = [
+    {
+        "id": "p001",
+        "name": "Lutein 20mg",
+        "brand": "NOW Foods",
+        "price": 14.99,
+        "serving_size": "1 Softgel",
+        ...
+    },
+    # ... 4종 추가
+]
 
-class DBClient:
-    """Supabase 조회 클라이언트"""
-
-    def __init__(self):
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        self.client: Client = create_client(url, key)
-
-    def get_all_products(self) -> List[Dict]:
-        """전체 제품 목록 조회"""
-        response = self.client.table('products').select('*').execute()
-        return response.data
-
-    def search_products(self, keyword: str) -> List[Dict]:
-        """
-        제품 검색 (이름 기준)
-
-        Args:
-            keyword: 검색 키워드
-
-        Returns:
-            List[Dict]: 검색된 제품 목록
-        """
-        if not keyword.strip():
-            return self.get_all_products()
-
-        response = self.client.table('products')\
-            .select('*')\
-            .ilike('name', f'%{keyword}%')\
-            .execute()
-        return response.data
-
-    def get_reviews_by_product(self, product_id: str) -> List[Dict]:
-        """
-        제품별 리뷰 조회
-
-        Args:
-            product_id: 제품 UUID
-
-        Returns:
-            List[Dict]: 리뷰 목록
-        """
-        response = self.client.table('reviews')\
-            .select('*')\
-            .eq('product_id', product_id)\
-            .execute()
-        return response.data
-
-    def get_product_with_reviews(self, product_id: str) -> Dict:
-        """
-        제품 정보와 리뷰를 함께 조회
-
-        Returns:
-            Dict: {'product': {...}, 'reviews': [...]}
-        """
-        product = self.client.table('products')\
-            .select('*')\
-            .eq('id', product_id)\
-            .single()\
-            .execute()
-
-        reviews = self.get_reviews_by_product(product_id)
-
-        return {
-            'product': product.data,
-            'reviews': reviews
+def generate_reviews_for_product(product_id, product_name, count=20):
+    """
+    각 제품당 20개의 다양한 리뷰 생성
+    - 긍정 (60%), 중립 (20%), 부정 (15%), 광고성 (5%)
+    """
+    reviews = []
+    for i in range(count):
+        # 리뷰 타입 결정 및 생성
+        review = {
+            "product_id": product_id,
+            "text": review_text,
+            "rating": rating,
+            "date": date,
+            "reorder": reorder,
+            "one_month_use": one_month_use,
+            "reviewer": reviewer,
+            "verified": verified
         }
+        reviews.append(review)
+    return reviews
+
+def generate_checklist_results(reviews):
+    """8단계 체크리스트 결과 생성"""
+    return {
+        "1_verified_purchase": {"passed": ..., "rate": ..., "description": ...},
+        "2_reorder_rate": {...},
+        "3_long_term_use": {...},
+        "4_rating_distribution": {...},
+        "5_review_length": {...},
+        "6_time_distribution": {...},
+        "7_ad_detection": {...},
+        "8_reviewer_diversity": {...}
+    }
+
+def generate_ai_analysis(product, checklist):
+    """AI 약사의 분석 결과 생성"""
+    return {
+        "trust_score": float,
+        "trust_level": "high|medium|low",
+        "summary": str,
+        "efficacy": str,
+        "side_effects": str,
+        "recommendations": str,
+        "warnings": str
+    }
+
+# 데이터 접근 함수
+def get_all_products() -> List[Dict]
+def get_product_by_id(product_id) -> Dict
+def get_reviews_by_product(product_id) -> List[Dict]
+def get_analysis_result(product_id) -> Dict
+def get_all_analysis_results() -> Dict
+def search_products(query) -> List[Dict]
 ```
 
-### 2. `app.py`
+### 2. `app.py` (메인 UI 앱)
 
-#### `main()`
 ```python
+# ui_integration/app.py
+
+st.set_page_config(
+    page_title="건기식 리뷰 팩트체크",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 def main():
-    """Streamlit 메인 함수"""
-    st.set_page_config(
-        page_title="건기식 리뷰 팩트체크",
-        page_icon="🔍",
-        layout="wide"
+    """메인 앱 함수"""
+    # 헤더
+    st.markdown('<div class="main-title">🔍 건기식 리뷰 팩트체크</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">루테인 제품 상위 3종 비교 분석</div>', unsafe_allow_html=True)
+
+    # 사이드바 - 검색 및 필터
+    with st.sidebar:
+        st.markdown("### 🔎 제품 검색")
+        search_query = st.text_input(
+            "제품명 또는 브랜드 검색",
+            placeholder="예: NOW Foods, Lutein...",
+            key="search"
+        )
+        st.markdown("### ℹ️ 신뢰도 등급 안내")
+        st.markdown("""
+        - **HIGH (70점 이상)**: 신뢰할 수 있는 제품
+        - **MEDIUM (50-70점)**: 보통 수준
+        - **LOW (50점 미만)**: 주의 필요
+        """)
+
+    # 데이터 로드
+    all_analysis = get_all_analysis_results()
+
+    # 검색 처리
+    if search_query:
+        filtered_products = search_products(search_query)
+        products_data = [all_analysis[p["id"]] for p in filtered_products]
+    else:
+        products_data = list(all_analysis.values())
+
+    # 신뢰도 점수 기준 정렬 (내림차순)
+    products_data_sorted = sorted(
+        products_data,
+        key=lambda x: x["ai_result"]["trust_score"],
+        reverse=True
     )
 
-    # 사이드바 렌더링
-    sidebar_data = render_sidebar()
+    # 상위 3개 선별
+    top3_products = products_data_sorted[:3]
+    other_products = products_data_sorted[3:]
 
-    # 메인 화면 렌더링
-    if sidebar_data.get('analyze_clicked'):
-        run_analysis(sidebar_data)
-    else:
-        render_welcome_screen()
+    # 섹션 1: 상위 3개 제품 카드 (가로 배치)
+    st.markdown('<div class="section-header">📦 제품 개요 (상위 3개)</div>', unsafe_allow_html=True)
+
+    cols = st.columns(3)
+    rank_badges = {0: "🥇", 1: "🥈", 2: "🥉"}
+
+    for idx, data in enumerate(top3_products):
+        product = data["product"]
+        ai_result = data["ai_result"]
+
+        with cols[idx]:
+            st.markdown(f'<div style="text-align: center; font-size: 36px;">{rank_badges[idx]}</div>', unsafe_allow_html=True)
+            st.markdown(f"**{product['brand']}**")
+            st.markdown(f"<small>{product['name']}</small>", unsafe_allow_html=True)
+
+            # 신뢰도 게이지
+            fig_gauge = render_gauge_chart(ai_result["trust_score"], "신뢰도")
+            st.plotly_chart(fig_gauge, key=f"gauge_{product['id']}")
+
+            # 신뢰도 배지
+            st.markdown(render_trust_badge(ai_result["trust_level"]), unsafe_allow_html=True)
+
+    # 섹션 2: 비교 테이블 (상위 3개만)
+    st.markdown('<div class="section-header">📊 종합 비교표 (상위 3개)</div>', unsafe_allow_html=True)
+
+    comparison_df = render_comparison_table(top3_products)
+    st.dataframe(comparison_df, hide_index=True, height=250)
+
+    # 섹션 3: 차트 분석 (상위 3개만)
+    st.markdown('<div class="section-header">📈 시각화 분석 (상위 3개)</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### 🕸️ 다차원 비교 (레이더 차트)")
+        fig_radar = render_radar_chart(top3_products)
+        st.plotly_chart(fig_radar, key="radar_main")
+
+    with col2:
+        st.markdown("#### 💰 가격 비교")
+        fig_price = render_price_comparison_chart(top3_products)
+        st.plotly_chart(fig_price, key="price_main")
 ```
 
-#### `render_sidebar()`
+### 3. `visualizations.py` (시각화 컴포넌트)
+
 ```python
-def render_sidebar() -> Dict:
-    """
-    사이드바 렌더링 (검색창 기반)
+# ui_integration/visualizations.py
 
-    Returns:
-        Dict: 사용자 입력 데이터
-        {
-            'selected_products': [product1, product2, ...],
-            'filter_ads': True,
-            'analyze_clicked': bool
-        }
-    """
-    from ui_integration.db_client import DBClient
-
-    db = DBClient()
-
-    with st.sidebar:
-        st.title("🔍 분석 설정")
-
-        # 검색창
-        search_keyword = st.text_input(
-            "제품 검색",
-            placeholder="루테인 검색...",
-            help="제품명으로 검색하세요"
-        )
-
-        # 제품 검색 및 목록 표시
-        products = db.search_products(search_keyword)
-
-        if not products:
-            st.warning("등록된 제품이 없습니다.")
-            return {'analyze_clicked': False}
-
-        # 제품 선택 (멀티셀렉트)
-        product_options = {p['name']: p for p in products}
-        selected_names = st.multiselect(
-            "분석할 제품 선택 (최대 3개)",
-            options=list(product_options.keys()),
-            max_selections=3,
-            help="비교 분석하려면 2-3개 선택"
-        )
-
-        selected_products = [product_options[name] for name in selected_names]
-
-        st.divider()
-
-        # 필터 옵션
-        filter_ads = st.checkbox("광고 의심 리뷰 하이라이트", value=True)
-
-        # 분석 시작 버튼
-        analyze_clicked = st.button(
-            "🔬 분석 시작",
-            type="primary",
-            use_container_width=True,
-            disabled=len(selected_products) == 0
-        )
-
-        # 선택된 제품 수 표시
-        if selected_products:
-            st.caption(f"✅ {len(selected_products)}개 제품 선택됨")
-
-        return {
-            'selected_products': selected_products,
-            'filter_ads': filter_ads,
-            'analyze_clicked': analyze_clicked
-        }
-```
-
-#### `run_analysis()`
-```python
-def run_analysis(sidebar_data: Dict):
-    """
-    분석 실행 및 결과 표시
-
-    Args:
-        sidebar_data: 사이드바에서 받은 입력 데이터
-    """
-    from ui_integration.db_client import DBClient
-    from logic_designer.checklist import AdPatternChecker
-    from logic_designer.trust_score import TrustScoreCalculator
-    from logic_designer.ai_analyzer import PharmacistAnalyzer
-
-    selected_products = sidebar_data.get('selected_products', [])
-
-    if not selected_products:
-        st.error("최소 1개 이상의 제품을 선택해주세요.")
-        return
-
-    db = DBClient()
-
-    # 진행 상황 표시
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    results = []
-
-    for idx, product in enumerate(selected_products):
-        product_name = product['name']
-        status_text.info(f"📦 {product_name} 분석 중... ({idx+1}/{len(selected_products)})")
-
-        # Supabase에서 리뷰 조회
-        progress_bar.progress((idx * 3 + 1) / (len(selected_products) * 3))
-        reviews = db.get_reviews_by_product(product['id'])
-
-        if not reviews:
-            st.warning(f"{product_name}: 리뷰가 없습니다.")
-            continue
-
-        # 팀원 B: 체크리스트 분석
-        progress_bar.progress((idx * 3 + 2) / (len(selected_products) * 3))
-
-        checker = AdPatternChecker()
-        checklist_results = [checker.check_all_patterns(r) for r in reviews]
-
-        # 신뢰도 계산
-        trust_calc = TrustScoreCalculator()
-        trust_result = trust_calc.calculate(reviews, checklist_results)
-
-        # AI 분석
-        progress_bar.progress((idx * 3 + 3) / (len(selected_products) * 3))
-        analyzer = PharmacistAnalyzer()
-        ai_result = analyzer.analyze(reviews, product)
-
-        results.append({
-            'product': product,
-            'reviews': reviews,
-            'trust_score': trust_result['score'],
-            'trust_level': trust_result['level'],
-            'checklist_results': checklist_results,
-            'ai_result': ai_result
-        })
-
-    # 결과 표시
-    progress_bar.progress(1.0)
-    status_text.success("✅ 분석 완료!")
-
-    if len(results) == 1:
-        render_single_result(results[0])
-    else:
-        render_comparison_results(results)
-```
-
-### 3. `components.py`
-
-#### `render_trust_gauge()`
-```python
-def render_trust_gauge(score: float, level: str, size: int = 200):
+def render_gauge_chart(score, title="신뢰도"):
     """
     신뢰도 게이지 차트 렌더링
-    
+
     Args:
-        score: 신뢰도 점수 (0 ~ 100)
-        level: 신뢰도 등급 ('high' | 'medium' | 'low')
-        size: 차트 크기
-    """
-    fig = create_gauge_chart(score, level, size)
-    st.plotly_chart(fig, use_container_width=True)
-```
+        score (float): 0-100 사이의 점수
+        title (str): 차트 제목
 
-#### `render_product_card()`
-```python
-def render_product_card(product_data: Dict):
-    """
-    제품 카드 컴포넌트 렌더링
-    
-    Args:
-        product_data: {
-            'name': '제품명',
-            'trust_score': 85,
-            'trust_level': 'high',
-            'review_count': 127,
-            'badge': '가장 정직한 리뷰'
-        }
-    """
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown(f"### {product_data['name']}")
-        render_trust_gauge(
-            product_data['trust_score'],
-            product_data['trust_level']
-        )
-        st.caption(f"{product_data['review_count']}개 리뷰 분석")
-```
-
-#### `render_comparison_table()`
-```python
-def render_comparison_table(products: List[Dict]):
-    """
-    비교 테이블 렌더링
-    
-    Args:
-        products: 제품 분석 결과 리스트
-    """
-    # 테이블 데이터 구성
-    table_data = {
-        '비교 항목': [
-            '광고 의심 비율',
-            '핵심 체감 효능',
-            '주요 부작용 리포트',
-            '실제 재구매율',
-            '한 달 이상 사용자 비율',
-            '포토 리뷰 비율'
-        ]
-    }
-    
-    for idx, product in enumerate(products):
-        table_data[f'제품 {idx+1}'] = [
-            f"{product['ad_suspicion_rate']:.1f}%",
-            format_efficacy(product['efficacy']),
-            format_side_effects(product['side_effects']),
-            f"{product['reorder_rate']:.1f}%",
-            f"{product['usage_period_rate']:.1f}%",
-            f"{product['photo_review_rate']:.1f}%"
-        ]
-    
-    df = pd.DataFrame(table_data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-```
-
-### 3. `visualizations.py`
-
-#### `create_gauge_chart()`
-```python
-import plotly.graph_objects as go
-
-def create_gauge_chart(score: float, level: str, size: int = 200) -> go.Figure:
-    """
-    게이지 차트 생성
-    
-    Args:
-        score: 신뢰도 점수 (0 ~ 100)
-        level: 신뢰도 등급
-        size: 차트 크기
-    
     Returns:
-        go.Figure: Plotly Figure 객체
+        plotly.graph_objects.Figure
     """
-    # 색상 설정
-    colors = {
-        'high': '#10b981',
-        'medium': '#f59e0b',
-        'low': '#ef4444'
-    }
-    color = colors.get(level, '#666')
-    
-    # 게이지 각도 계산
-    angle = (score / 100) * 360
-    
+    if score >= 70:
+        color = "#22c55e"  # green
+        level = "HIGH"
+    elif score >= 50:
+        color = "#f59e0b"  # amber
+        level = "MEDIUM"
+    else:
+        color = "#ef4444"  # red
+        level = "LOW"
+
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
+        mode="gauge+number+delta",
         value=score,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "신뢰도 점수"},
+        number={'suffix': "", 'font': {'size': 32, 'color': color}},
         gauge={
-            'axis': {'range': [None, 100]},
-            'bar': {'color': color},
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': color, 'thickness': 0.75},
             'steps': [
-                {'range': [0, 50], 'color': "lightgray"},
-                {'range': [50, 70], 'color': "gray"}
+                {'range': [0, 50], 'color': '#fee2e2'},
+                {'range': [50, 70], 'color': '#fef3c7'},
+                {'range': [70, 100], 'color': '#dcfce7'}
             ],
             'threshold': {
-                'line': {'color': "red", 'width': 4},
+                'line': {'color': "darkgray", 'width': 4},
                 'thickness': 0.75,
-                'value': 90
+                'value': score
             }
         }
     ))
-    
-    fig.update_layout(height=size, margin=dict(l=20, r=20, t=40, b=20))
-    return fig
-```
 
-#### `create_pie_chart()`
-```python
-def create_pie_chart(data: Dict, title: str = "") -> go.Figure:
-    """
-    파이 차트 생성
-    
-    Args:
-        data: {
-            'labels': ['항목1', '항목2', ...],
-            'values': [값1, 값2, ...],
-            'colors': ['색상1', '색상2', ...]
-        }
-        title: 차트 제목
-    """
-    fig = go.Figure(data=[go.Pie(
-        labels=data['labels'],
-        values=data['values'],
-        hole=0.3,
-        marker_colors=data.get('colors', None)
-    )])
-    
-    fig.update_traces(
-        textposition='inside',
-        textinfo='percent+label'
-    )
-    
-    fig.update_layout(
-        title=title,
-        showlegend=True
-    )
-    
+    fig.update_layout(height=200, margin=dict(l=20, r=20, t=40, b=20))
     return fig
-```
 
-#### `create_radar_chart()`
-```python
-def create_radar_chart(products: List[Dict]) -> go.Figure:
+
+def render_trust_badge(level):
     """
-    레이더 차트 생성 (3종 비교)
-    
+    신뢰도 등급 배지 렌더링 (HTML)
+
     Args:
-        products: 제품 분석 결과 리스트
-    
+        level (str): 'high', 'medium', 'low'
+
     Returns:
-        go.Figure: Plotly 레이더 차트
+        str: HTML 배지 코드
     """
-    categories = [
-        '신뢰도',
-        '재구매율',
-        '사용기간',
-        '효능',
-        '가격대비'
-    ]
-    
+    badge_configs = {
+        "high": {"text": "HIGH TRUST", "bg_color": "#22c55e", "icon": "✓"},
+        "medium": {"text": "MEDIUM TRUST", "bg_color": "#f59e0b", "icon": "○"},
+        "low": {"text": "LOW TRUST", "bg_color": "#ef4444", "icon": "✕"}
+    }
+
+    config = badge_configs.get(level.lower(), badge_configs["medium"])
+
+    return f"""
+    <div style="display: inline-block; background-color: {config['bg_color']};
+        color: white; padding: 4px 12px; border-radius: 12px;
+        font-weight: bold; font-size: 12px;">
+        {config['icon']} {config['text']}
+    </div>
+    """
+
+
+def render_comparison_table(products_data):
+    """
+    제품 비교 테이블 렌더링 (pandas DataFrame)
+
+    Args:
+        products_data (list): 제품 분석 결과 리스트
+
+    Returns:
+        pandas.DataFrame
+    """
+    table_data = []
+
+    for data in products_data:
+        product = data["product"]
+        ai_result = data["ai_result"]
+        reviews = data["reviews"]
+
+        ad_suspected = sum(1 for r in reviews if r["rating"] == 5 and not r["one_month_use"] and len(r["text"]) < 100)
+        ad_rate = ad_suspected / len(reviews) * 100 if reviews else 0
+
+        reorder_rate = sum(1 for r in reviews if r["reorder"]) / len(reviews) * 100 if reviews else 0
+        one_month_rate = sum(1 for r in reviews if r["one_month_use"]) / len(reviews) * 100 if reviews else 0
+        avg_rating = sum(r["rating"] for r in reviews) / len(reviews) if reviews else 0
+
+        table_data.append({
+            "제품명": f"{product['brand']}\n{product['name']}",
+            "신뢰도": f"{ai_result['trust_score']:.1f}",
+            "광고의심률": f"{ad_rate:.1f}%",
+            "재구매율": f"{reorder_rate:.1f}%",
+            "한달사용": f"{one_month_rate:.1f}%",
+            "평균평점": f"{avg_rating:.1f}"
+        })
+
+    return pd.DataFrame(table_data)
+
+
+def render_radar_chart(products_data):
+    """
+    5개 제품 다차원 비교 레이더 차트
+
+    Args:
+        products_data (list): 제품 분석 결과 리스트
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
     fig = go.Figure()
-    
-    colors = ['#3b82f6', '#ef4444', '#10b981']
-    
-    for idx, product in enumerate(products):
-        values = [
-            product['trust_score'] / 100 * 10,
-            product['reorder_rate'] / 100 * 10,
-            product['usage_period_rate'] / 100 * 10,
-            product.get('efficacy_score', 7),
-            product.get('value_score', 7)
-        ]
-        
+
+    categories = ['신뢰도', '재구매율', '한달사용', '평균평점', '리뷰다양성']
+    colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6']
+
+    for idx, data in enumerate(products_data):
+        product = data["product"]
+        ai_result = data["ai_result"]
+        reviews = data["reviews"]
+
+        trust_score = ai_result['trust_score']
+        reorder_rate = sum(1 for r in reviews if r["reorder"]) / len(reviews) * 100 if reviews else 0
+        one_month_rate = sum(1 for r in reviews if r["one_month_use"]) / len(reviews) * 100 if reviews else 0
+        avg_rating = sum(r["rating"] for r in reviews) / len(reviews) * 20 if reviews else 0
+        diversity_rate = len(set(r["reviewer"] for r in reviews)) / len(reviews) * 100 if reviews else 0
+
+        values = [trust_score, reorder_rate, one_month_rate, avg_rating, diversity_rate]
+
         fig.add_trace(go.Scatterpolar(
             r=values,
             theta=categories,
             fill='toself',
-            name=f"제품 {idx+1}",
-            line_color=colors[idx % len(colors)]
+            name=f"{product['brand']}",
+            line=dict(color=colors[idx % len(colors)], width=2),
+            opacity=0.6
         ))
-    
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 10]
-            )
-        ),
-        showlegend=True,
-        title="3종 비교 레이더 차트"
-    )
-    
-    return fig
-```
 
-#### `create_bar_chart()`
-```python
-def create_bar_chart(data: Dict, title: str = "") -> go.Figure:
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=True,
+        height=400,
+        margin=dict(l=80, r=80, t=40, b=80),
+        font={'color': "#1f2937", 'family': "Arial"}
+    )
+
+    return fig
+
+
+def render_review_sentiment_chart(reviews):
     """
-    바 차트 생성
-    
+    리뷰 감정 분포 차트 (평점별)
+
     Args:
-        data: {
-            'x': ['항목1', '항목2', ...],
-            'y': [값1, 값2, ...],
-            'colors': ['색상1', '색상2', ...]
-        }
-        title: 차트 제목
+        reviews (list): 리뷰 리스트
+
+    Returns:
+        plotly.graph_objects.Figure
     """
+    rating_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+
+    for review in reviews:
+        rating_counts[review["rating"]] += 1
+
     fig = go.Figure(data=[
         go.Bar(
-            x=data['x'],
-            y=data['y'],
-            marker_color=data.get('colors', '#2563eb')
+            x=list(rating_counts.keys()),
+            y=list(rating_counts.values()),
+            marker_color=['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981'],
+            text=list(rating_counts.values()),
+            textposition='auto',
         )
     ])
-    
+
     fig.update_layout(
-        title=title,
-        xaxis_title="항목",
-        yaxis_title="값"
+        title="평점 분포",
+        xaxis_title="평점 (별점)",
+        yaxis_title="리뷰 수",
+        height=300,
+        showlegend=False
     )
-    
+
+    return fig
+
+
+def render_checklist_visual(checklist_results):
+    """
+    8단계 체크리스트 시각화 (Streamlit 컴포넌트 사용)
+
+    Args:
+        checklist_results (dict): 체크리스트 결과
+
+    Note:
+        이 함수는 Streamlit 컴포넌트를 직접 렌더링합니다.
+    """
+    for key, result in checklist_results.items():
+        step_name = result["description"]
+        rate = result["rate"]
+        passed = result["passed"]
+
+        icon = "✅" if passed else "❌"
+        color = "green" if passed else "red"
+
+        st.markdown(f"{icon} **{step_name}** - :{color}[{rate * 100:.0f}%]")
+        st.progress(rate)
+
+
+def render_price_comparison_chart(products_data):
+    """
+    가격 비교 차트
+
+    Args:
+        products_data (list): 제품 분석 결과 리스트
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    product_names = []
+    prices = []
+    trust_scores = []
+
+    for data in products_data:
+        product = data["product"]
+        ai_result = data["ai_result"]
+
+        product_names.append(f"{product['brand']}")
+        prices.append(product["price"])
+        trust_scores.append(ai_result["trust_score"])
+
+    colors = ['#22c55e' if score >= 70 else '#f59e0b' if score >= 50 else '#ef4444' for score in trust_scores]
+
+    fig = go.Figure(data=[
+        go.Bar(
+            x=product_names,
+            y=prices,
+            marker_color=colors,
+            text=[f"${p:.2f}" for p in prices],
+            textposition='auto',
+        )
+    ])
+
+    fig.update_layout(
+        title="제품 가격 비교",
+        xaxis_title="브랜드",
+        yaxis_title="가격 (USD)",
+        height=300,
+        showlegend=False
+    )
+
     return fig
 ```
 
@@ -695,272 +619,39 @@ sequenceDiagram
 
 ---
 
-## 🛠️ 구현 가이드
+## 🛠️ 실제 구현 요약
 
-### 1단계: 기본 Streamlit 앱 구조
+### 개발된 주요 모듈
 
-```python
-# ui_integration/app.py
-import streamlit as st
-import sys
-import os
+#### 1. `app.py` (메인 애플리케이션)
+- **크기**: 390줄
+- **주요 기능**:
+  - 페이지 설정 및 커스텀 CSS
+  - 사이드바 검색 기능
+  - 상위 3개 제품 카드 표시
+  - 6개 섹션으로 구성된 메인 레이아웃
+  - 리뷰 상세 보기 및 필터링
+  - 푸터 정보 표시
 
-# 상위 디렉토리 경로 추가
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#### 2. `mock_data.py` (데이터 생성)
+- **크기**: 323줄
+- **포함 데이터**:
+  - 루테인 제품 5종 (NOW Foods, Doctor's Best, Jarrow, Life Extension, California Gold)
+  - 각 제품당 20개의 리뷰 (총 100개)
+  - 다양한 리뷰 타입: 긍정(60%), 중립(20%), 부정(15%), 광고성(5%)
+  - 8단계 체크리스트 결과
+  - AI 약사 분석 결과
 
-from ui_integration.db_client import DBClient
-from logic_designer.checklist import AdPatternChecker
-from logic_designer.trust_score import TrustScoreCalculator
-from logic_designer.ai_analyzer import PharmacistAnalyzer
-
-def main():
-    st.set_page_config(
-        page_title="건기식 리뷰 팩트체크",
-        page_icon="🔍",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-
-    # 커스텀 CSS
-    st.markdown("""
-    <style>
-    .main {
-        padding: 2rem;
-    }
-    .stButton>button {
-        width: 100%;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    sidebar_data = render_sidebar()
-
-    if sidebar_data.get('analyze_clicked'):
-        run_analysis(sidebar_data)
-    else:
-        render_welcome_screen()
-
-
-def render_welcome_screen():
-    """환영 화면 렌더링"""
-    st.title("🔍 건기식 리뷰 팩트체크")
-    st.markdown("### 루테인 제품 리뷰 분석 시스템")
-    st.info("👈 사이드바에서 제품을 검색하고 선택한 후 분석을 시작하세요.")
-
-    # 데이터베이스 상태 표시
-    db = DBClient()
-    products = db.get_all_products()
-
-    st.markdown("---")
-    st.markdown("#### 📦 등록된 제품")
-
-    if products:
-        for product in products:
-            st.markdown(f"- **{product['name']}** ({product['brand']})")
-    else:
-        st.warning("등록된 제품이 없습니다. 팀원 A에게 데이터 업로드를 요청하세요.")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### 2단계: 분석 실행 함수
-
-```python
-def run_analysis(sidebar_data: Dict):
-    """분석 실행 (Supabase 기반)"""
-    from ui_integration.db_client import DBClient
-
-    selected_products = sidebar_data.get('selected_products', [])
-
-    if not selected_products:
-        st.error("❌ 최소 1개 이상의 제품을 선택해주세요.")
-        return
-
-    db = DBClient()
-
-    # 진행 상황 표시
-    progress_container = st.container()
-    with progress_container:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-    results = []
-
-    try:
-        for idx, product in enumerate(selected_products):
-            product_name = product['name']
-            status_text.info(f"📦 {product_name} 분석 중... ({idx+1}/{len(selected_products)})")
-
-            # Supabase에서 리뷰 조회
-            progress = (idx * 3 + 1) / (len(selected_products) * 3)
-            progress_bar.progress(progress)
-
-            with st.spinner("리뷰 조회 중..."):
-                reviews = db.get_reviews_by_product(product['id'])
-
-            if not reviews:
-                st.warning(f"{product_name}: 리뷰가 없습니다.")
-                continue
-
-            # 팀원 B: 체크리스트 분석
-            progress = (idx * 3 + 2) / (len(selected_products) * 3)
-            progress_bar.progress(progress)
-
-            with st.spinner("광고 패턴 분석 중..."):
-                checker = AdPatternChecker()
-                checklist_results = [checker.check_all_patterns(r) for r in reviews]
-
-            with st.spinner("신뢰도 계산 중..."):
-                trust_calc = TrustScoreCalculator()
-                trust_result = trust_calc.calculate(reviews, checklist_results)
-
-            # 팀원 B: AI 분석
-            progress = (idx * 3 + 3) / (len(selected_products) * 3)
-            progress_bar.progress(progress)
-
-            with st.spinner("AI 약사 분석 중..."):
-                analyzer = PharmacistAnalyzer()
-                ai_result = analyzer.analyze(reviews, product)
-
-            # 결과 저장
-            results.append({
-                'product': product,
-                'reviews': reviews,
-                'trust_score': trust_result['score'],
-                'trust_level': trust_result['level'],
-                'checklist_results': checklist_results,
-                'ai_result': ai_result
-            })
-
-        # 진행 상황 완료
-        progress_bar.progress(1.0)
-        status_text.success("✅ 분석 완료!")
-
-        # 결과 표시
-        if len(results) == 1:
-            render_single_result(results[0])
-        else:
-            render_comparison_results(results)
-
-    except Exception as e:
-        st.error(f"❌ 오류 발생: {str(e)}")
-        st.exception(e)
-```
-
-### 3단계: 결과 표시 함수
-
-```python
-def render_single_result(result: Dict):
-    """단일 제품 결과 표시"""
-    product = result['product']
-
-    st.header(f"📊 {product['name']} 분석 결과")
-
-    # 제품 카드
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        render_product_card({
-            'name': product['name'],
-            'brand': product['brand'],
-            'trust_score': result['trust_score'],
-            'trust_level': result['trust_level'],
-            'review_count': len(result['reviews'])
-        })
-
-    # 상세 비교 테이블
-    st.subheader("📋 상세 분석")
-    render_comparison_table([result])
-
-    # 약사 인사이트
-    st.subheader("💊 AI 약사의 인사이트")
-    render_pharmacist_insight(result['ai_result'])
-
-
-def render_comparison_results(results: List[Dict]):
-    """3종 비교 결과 표시"""
-    st.header("🔍 루테인 제품 비교 분석 리포트")
-
-    # 제품 카드
-    cols = st.columns(len(results))
-    for idx, (col, result) in enumerate(zip(cols, results)):
-        product = result['product']
-        with col:
-            render_product_card({
-                'name': product['name'],
-                'brand': product['brand'],
-                'trust_score': result['trust_score'],
-                'trust_level': result['trust_level'],
-                'review_count': len(result['reviews'])
-            })
-
-    # 비교 테이블
-    st.subheader("📋 팩트체크 상세 비교")
-    render_comparison_table(results)
-
-    # 약사 인사이트
-    st.subheader("💊 AI 약사의 심층 비교 리포트")
-    for result in results:
-        product = result['product']
-        with st.expander(f"{product['name']} ({product['brand']}) 상세 분석"):
-            render_pharmacist_insight(result['ai_result'])
-
-    # 레이더 차트
-    st.subheader("📊 신뢰도-효능-가격 비교")
-    radar_fig = create_radar_chart(results)
-    st.plotly_chart(radar_fig, use_container_width=True)
-```
-
----
-
-## 🎨 시각화 예시 코드
-
-### 게이지 차트 상세 구현
-
-```python
-# ui_integration/visualizations.py
-import plotly.graph_objects as go
-
-def create_gauge_chart(score: float, level: str, size: int = 200) -> go.Figure:
-    """게이지 차트 생성"""
-    # 색상 설정
-    color_map = {
-        'high': '#10b981',
-        'medium': '#f59e0b',
-        'low': '#ef4444'
-    }
-    color = color_map.get(level, '#666')
-    
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=score,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "신뢰도 점수", 'font': {'size': 20}},
-        delta={'reference': 50},
-        gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1},
-            'bar': {'color': color},
-            'steps': [
-                {'range': [0, 50], 'color': "lightgray"},
-                {'range': [50, 70], 'color': "gray"}
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 90
-            }
-        }
-    ))
-    
-    fig.update_layout(
-        height=size,
-        margin=dict(l=20, r=20, t=40, b=20),
-        font={'color': "darkblue", 'family': "Arial"}
-    )
-    
-    return fig
-```
+#### 3. `visualizations.py` (시각화)
+- **크기**: 355줄
+- **구현된 차트**:
+  - 게이지 차트 (신뢰도 점수)
+  - 신뢰도 배지 (HTML)
+  - 비교 테이블 (pandas DataFrame)
+  - 레이더 차트 (5차원 비교)
+  - 평점 분포 차트 (막대 그래프)
+  - 가격 비교 차트
+  - 체크리스트 시각화 (progress bar)
 
 ---
 
@@ -1014,54 +705,129 @@ def test_gauge_chart():
 
 ## ✅ 체크리스트
 
-- [ ] Streamlit 기본 앱 구조 구현
-- [ ] db_client.py 구현 (Supabase 조회)
-- [ ] 검색창 UI 구현
-- [ ] 제품 선택 (멀티셀렉트) 구현
-- [ ] 메인 화면 레이아웃 구현
-- [ ] Supabase 연동 테스트
-- [ ] 팀원 B 모듈 통합
-- [ ] 게이지 차트 구현
-- [ ] 파이 차트 구현
-- [ ] 레이더 차트 구현
-- [ ] 바 차트 구현
-- [ ] 비교 테이블 구현
-- [ ] 약사 인사이트 섹션 구현
-- [ ] 3종 비교 기능 구현
-- [ ] 에러 핸들링 추가
-- [ ] 로딩 상태 표시
-- [ ] 반응형 디자인 적용
+- [x] Streamlit 기본 앱 구조 구현 (app.py - 390줄)
+- [x] mock_data.py 구현 (루테인 제품 5종 + 리뷰 100개 + 분석)
+- [x] 검색창 UI 구현 (사이드바 검색)
+- [x] 제품 선택 및 필터 기능 구현
+- [x] 메인 화면 레이아웃 구현 (6개 섹션)
+- [x] 게이지 차트 구현 (render_gauge_chart)
+- [x] 신뢰도 배지 구현 (render_trust_badge)
+- [x] 레이더 차트 구현 (render_radar_chart)
+- [x] 바 차트 구현 - 평점 분포 (render_review_sentiment_chart)
+- [x] 가격 비교 차트 구현 (render_price_comparison_chart)
+- [x] 비교 테이블 구현 (render_comparison_table)
+- [x] 체크리스트 시각화 구현 (render_checklist_visual - st.progress)
+- [x] AI 약사 인사이트 섹션 구현 (expander)
+- [x] 상위 3개 제품 비교 기능 구현 (순위 배지 포함)
+- [x] 리뷰 상세 보기 구현 (필터링, 하이라이트)
+- [x] 광고 의심 리뷰 탐지 및 하이라이트
+- [x] 커스텀 CSS 스타일 적용
+- [x] 반응형 레이아웃 (가로 배치)
 
 ---
 
 ## 🚀 실행 방법
 
-```bash
-# Streamlit 앱 실행
-streamlit run ui_integration/app.py
+### 1. 의존성 설치
 
-# 또는 포트 지정
-streamlit run ui_integration/app.py --server.port 8501
+```bash
+cd ui_integration
+pip install -r requirements.txt
 ```
+
+### 2. Streamlit 앱 실행
+
+```bash
+streamlit run app.py
+```
+
+또는 포트를 지정하여 실행:
+
+```bash
+streamlit run app.py --server.port 8501
+```
+
+### 3. 브라우저 접속
+
+자동으로 `http://localhost:8501` 이 열립니다.
+
+### 4. 앱 사용
+
+1. **검색**: 사이드바에서 제품명이나 브랜드 검색
+2. **필터**: 신뢰도 등급 안내 확인
+3. **보기**: 상위 3개 제품 카드, 비교 테이블, 차트, 약사 인사이트, 리뷰 상세 보기 등을 순서대로 탐색
+
+## 주요 화면 구성
+
+### 섹션 1: 제품 개요 (상위 3개)
+- 3개 카드 가로 배치
+- 순위 배지 (🥇🥈🥉)
+- 각 제품의 신뢰도 게이지 차트
+- 신뢰도 배지
+
+### 섹션 2: 종합 비교표 (상위 3개)
+- 제품명, 신뢰도, 광고의심률, 재구매율, 한달사용, 평균평점
+
+### 섹션 3: 시각화 분석 (상위 3개)
+- 왼쪽: 레이더 차트 (5차원 비교)
+- 오른쪽: 가격 비교 차트
+
+### 섹션 4: 기타 제품
+- 확장 패널에 나머지 2개 제품 표시
+
+### 섹션 5: AI 약사 인사이트 (상위 3개)
+- 각 제품별 expander
+- 요약, 효능, 부작용, 권장사항, 주의사항
+- 오른쪽: 체크리스트 결과 (progress bar)
+
+### 섹션 6: 리뷰 상세 보기 (상위 3개)
+- 제품 선택 selectbox
+- 필터 옵션 (광고 의심 하이라이트, 평점 필터)
+- 평점 분포 차트
+- 리뷰 카드 목록 (최대 20개)
 
 ---
 
-## 📌 통합 체크리스트
+## 📌 구현 완료 사항
 
-### Supabase 연동
-- [ ] 환경 변수 설정 (SUPABASE_URL, SUPABASE_KEY)
-- [ ] `DBClient` 연결 테스트
-- [ ] 제품 목록 조회 테스트
-- [ ] 리뷰 조회 테스트
+### UI 및 레이아웃
+- [x] Streamlit 기본 구조 완성
+- [x] 커스텀 CSS 스타일 적용 (카드, 메트릭, 리뷰 카드 등)
+- [x] 사이드바 검색 기능
+- [x] 신뢰도 등급 안내 섹션
+- [x] 6개 주요 섹션 구현
 
-### 팀원 B 모듈 연동
-- [ ] `logic_designer` 패키지 import 확인
-- [ ] `AdPatternChecker` 사용 테스트
-- [ ] `TrustScoreCalculator` 사용 테스트
-- [ ] `PharmacistAnalyzer` API 키 설정 확인 (ANTHROPIC_API_KEY)
+### 데이터 및 분석
+- [x] 목업 데이터 생성 (루테인 제품 5종)
+- [x] 리뷰 데이터 생성 (총 100개, 다양한 타입)
+- [x] 8단계 체크리스트 결과 생성
+- [x] AI 약사 분석 결과 생성
+- [x] 검색 기능 구현
 
-### 전체 워크플로우
-- [ ] 검색 → 제품 선택 → 분석 → 시각화 전체 플로우 테스트
-- [ ] 에러 발생 시 적절한 메시지 표시
-- [ ] 진행 상황 표시 정확성 확인
+### 시각화 및 차트
+- [x] 게이지 차트 (신뢰도 점수)
+- [x] 신뢰도 배지 (HTML/CSS)
+- [x] 레이더 차트 (5차원 비교)
+- [x] 평점 분포 차트 (막대 그래프)
+- [x] 가격 비교 차트
+- [x] 비교 테이블 (pandas DataFrame)
+- [x] 체크리스트 시각화 (progress bar)
+
+### 리뷰 및 필터링
+- [x] 리뷰 목록 표시 (최대 20개)
+- [x] 광고 의심 리뷰 자동 탐지 (5점 + 짧은 사용기간 + 짧은 텍스트)
+- [x] 광고 의심 리뷰 하이라이트 (빨간색 배경)
+- [x] 평점 필터링 기능
+- [x] 리뷰 배지 표시 (인증구매, 재구매, 1개월+)
+
+### 순위 및 표시
+- [x] 신뢰도 기준 정렬 (상위 3개 선별)
+- [x] 순위 배지 표시 (🥇🥈🥉)
+- [x] 기타 제품 확장 패널 (나머지 2개)
+- [x] AI 약사 인사이트 expander (상위 3개)
+
+### 설치 및 실행
+- [x] requirements.txt 작성 (streamlit, plotly, pandas)
+- [x] README.md 작성 (설치/실행 가이드)
+- [x] 구조적인 코드 조직화
 
