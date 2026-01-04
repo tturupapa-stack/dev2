@@ -65,3 +65,13 @@ test_results*.json
 
 ui_integration/__pycache__/
 
+# Node.js
+node_modules/
+
+# Playwright profile
+pw-profile/
+
+# Debug files
+debug_iherb.html
+debug_iherb.png
+debug_axios.html
