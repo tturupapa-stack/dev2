@@ -76,6 +76,26 @@ ANTHROPIC_API_KEY=your-anthropic-api-key  # NOT OpenAI
 - 한달 사용 비율: 20%
 - 평점 신뢰도: 10%
 
+## Development Workflow
+
+### 개발일지 작성 규칙
+
+**IMPORTANT**: 모든 작업 완료 후 반드시 개발일지를 작성할 것
+
+- **위치**: `개발일지/YYYY-MM-DD-작업_제목.md`
+- **작성 시점**: 의미 있는 작업(기능 추가, 버그 수정, 리팩토링 등) 완료 시
+- **필수 포함 내용**:
+  - 작업 개요
+  - 주요 작업 내용 (파일별 변경사항)
+  - 기술 스택 및 새로 추가된 의존성
+  - 트러블슈팅 (발생한 문제와 해결 방법)
+  - 업로드/배포 결과
+  - 배운 점
+  - 다음 단계
+
+- **작성 형식**: Markdown, 코드 블록과 스크린샷 포함
+- **명명 규칙**: `YYYY-MM-DD-간결한_작업_설명.md`
+
 ## Available Skills
 
 - **supervisor-report**: 복잡한 작업을 frontend-developer, backend-developer, test-runner, code-reviewer, doc-writer 에이전트에게 위임하고 결과를 검증
