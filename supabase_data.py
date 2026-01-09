@@ -8,44 +8,93 @@ import os
 import requests
 from typing import Dict, List, Optional
 
-# Streamlit Cloud secrets 또는 환경 변수에서 설정 로드
+# 디버그 모드
+DEBUG = True
+
 def _get_config():
     """Streamlit secrets 또는 환경 변수에서 Supabase 설정 가져오기"""
+    supabase_url = None
+    supabase_key = None
+    source = "none"
+
+    # 1. Streamlit Cloud secrets 먼저 시도
     try:
         import streamlit as st
-        # Streamlit Cloud secrets 사용
-        if hasattr(st, 'secrets') and 'SUPABASE_URL' in st.secrets:
-            return st.secrets['SUPABASE_URL'], st.secrets['SUPABASE_ANON_KEY']
-    except:
-        pass
+        if hasattr(st, 'secrets'):
+            if 'SUPABASE_URL' in st.secrets:
+                supabase_url = st.secrets['SUPABASE_URL']
+                supabase_key = st.secrets.get('SUPABASE_ANON_KEY')
+                source = "streamlit_secrets"
+                if DEBUG:
+                    st.sidebar.write(f"Config source: {source}")
+                    st.sidebar.write(f"URL loaded: {'Yes' if supabase_url else 'No'}")
+                    st.sidebar.write(f"Key loaded: {'Yes' if supabase_key else 'No'}")
+    except Exception as e:
+        if DEBUG:
+            print(f"Streamlit secrets error: {e}")
 
-    # 로컬 환경: .env 파일 사용
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-    except:
-        pass
+    # 2. 환경 변수에서 시도 (secrets가 없는 경우)
+    if not supabase_url:
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except:
+            pass
 
-    return os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY')
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_ANON_KEY')
+        if supabase_url:
+            source = "env_vars"
 
-SUPABASE_URL, SUPABASE_KEY = _get_config()
+    if DEBUG:
+        print(f"[DEBUG] Config source: {source}")
+        print(f"[DEBUG] SUPABASE_URL: {supabase_url[:50] if supabase_url else 'None'}...")
+        print(f"[DEBUG] SUPABASE_KEY: {'Set' if supabase_key else 'None'}")
+
+    return supabase_url, supabase_key
+
+# 설정을 함수 호출 시점에 로드 (lazy loading)
+_config_cache = None
+
+def _get_cached_config():
+    global _config_cache
+    if _config_cache is None:
+        _config_cache = _get_config()
+    return _config_cache
+
+def _get_supabase_url():
+    return _get_cached_config()[0]
+
+def _get_supabase_key():
+    return _get_cached_config()[1]
 
 def _get_headers():
     """API 요청 헤더 반환"""
+    key = _get_supabase_key()
     return {
-        'apikey': SUPABASE_KEY,
-        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'apikey': key,
+        'Authorization': f'Bearer {key}',
         'Content-Type': 'application/json'
     }
 
 
 def _fetch_from_supabase(table: str, params: str = '') -> List[Dict]:
     """Supabase REST API에서 데이터 가져오기"""
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    supabase_url = _get_supabase_url()
+    supabase_key = _get_supabase_key()
+
+    if not supabase_url or not supabase_key:
         print("Supabase 설정이 없습니다. secrets.toml 또는 .env 파일을 확인하세요.")
+        # Streamlit에서 경고 표시
+        try:
+            import streamlit as st
+            st.error("Supabase 연결 실패: secrets 설정을 확인하세요.")
+            st.info("Settings > Secrets에서 SUPABASE_URL과 SUPABASE_ANON_KEY를 설정하세요.")
+        except:
+            pass
         return []
 
-    url = f'{SUPABASE_URL}/rest/v1/{table}?{params}'
+    url = f'{supabase_url}/rest/v1/{table}?{params}'
     response = requests.get(url, headers=_get_headers())
     if response.status_code == 200:
         return response.json()
