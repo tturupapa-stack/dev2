@@ -1,0 +1,234 @@
+# 2주차 팀원 가이드 (로직/AI 분석)
+
+## 당신이 만들 것
+제품 스펙(성분표) + 리뷰 데이터를 분석해서 광고성 판별 + 약사 관점 인사이트 제공하는 프로그램
+
+---
+
+## Claude Code에 이렇게 요청하세요
+
+### 1단계: 프로젝트 시작
+```
+logic_designer라는 폴더를 만들고,
+건기식 제품 정보와 리뷰를 분석하는 프로그램을 만들어줘.
+
+최종적으로 이 함수가 필요해:
+analyze_product(collected_data)
+
+이 함수는 1주차에서 받은 데이터(제품 스펙 + 리뷰)를 분석해서
+약사 관점의 분석 결과를 반환해야 해.
+```
+
+### 2단계: 입력 형식 설명
+```
+analyze_product 함수가 받는 collected_data는 이런 형태야:
+
+{
+    'product_spec': {
+        'product_name': '종근당 프로바이오틱스',
+        'brand': '종근당',
+        'price': 32000,
+        'serving_size': '1캡슐 (500mg)',
+        'servings_per_container': 30,
+        'ingredients': [
+            {
+                'name': '프로바이오틱스',
+                'amount': '100억 CFU',
+                'daily_value': '100%'
+            },
+            {
+                'name': '비타민 D',
+                'amount': '400 IU',
+                'daily_value': '100%'
+            }
+        ],
+        'other_ingredients': ['젤라틴', '스테아린산 마그네슘'],
+        'warnings': ['임산부는 섭취 전 의사와 상담'],
+        'product_url': 'https://...'
+    },
+
+    'reviews': [
+        {
+            'text': '한달 먹어봤는데 소화가 좋아졌어요',
+            'rating': 5,
+            'date': '2024-01-15',
+            'reorder': True,
+            'one_month_use': True
+        }
+    ]
+}
+
+이런 딕셔너리가 들어온다고 가정하고 만들어줘.
+```
+
+### 3단계: 반환 형식 지정
+```
+analyze_product 함수는 반드시 이런 형태로 반환해야 해:
+
+{
+    'trust_score': 75.5,            (0~100 사이 숫자)
+    'trust_level': 'medium',        ('high', 'medium', 'low' 중 하나만!)
+
+    'checklist_results': {
+        'total_score': 0.7,
+        (나머지는 자유롭게)
+    },
+
+    'ai_result': {
+        'summary': '종합 요약 문장',
+        'efficacy': ['효능1', '효능2'],
+        'side_effects': ['부작용1'],
+        'recommendations': '권장사항 문장',
+        'trust_assessment': '신뢰도 평가 문장',
+        'warnings': ['주의사항1'],
+
+        'ingredient_analysis': {
+            'good_ingredients': ['성분명1', '성분명2'],
+            'caution_ingredients': ['성분명3'],
+            'daily_value_assessment': '일일 권장량 평가 문장'
+        }
+    }
+}
+
+ai_result 안의 7개 키는 반드시 다 있어야 해.
+(summary, efficacy, side_effects, recommendations,
+trust_assessment, warnings, ingredient_analysis)
+
+리스트는 비어있어도 되지만 []로 있어야 하고, None이면 안돼.
+```
+
+### 4단계: Claude API 설정 (중요!)
+```
+Claude API를 사용해야 해. (OpenAI 아님!)
+
+먼저 anthropic 라이브러리를 설치해줘.
+
+API 키는 환경변수 ANTHROPIC_API_KEY에서 가져와줘.
+python-dotenv 라이브러리 사용해서 .env 파일에서 읽어와.
+
+Claude 호출하는 코드 예시:
+
+from anthropic import Anthropic
+
+client = Anthropic()
+message = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    messages=[
+        {"role": "user", "content": "여기에 프롬프트"}
+    ]
+)
+result = message.content[0].text
+
+이런 식으로 사용해줘.
+```
+
+### 5단계: 테스트 요청
+```
+analyze_product 함수 테스트해줘.
+가짜 제품 데이터와 리뷰 데이터를 만들어서 넣어보고
+결과가 위에 말한 형식대로 나오는지 확인해줘.
+
+특히:
+1. trust_score가 0~100 사이 숫자인지
+2. trust_level이 'high', 'medium', 'low' 중 하나인지
+3. ai_result 안에 ingredient_analysis가 있는지
+4. ingredient_analysis 안에 good_ingredients, caution_ingredients가 있는지
+```
+
+---
+
+## 하지 마세요 (금지사항)
+
+| 하지 마세요 | 이유 |
+|-------------|------|
+| "리뷰 수집 기능도 만들어줘" | 수집은 1주차 담당입니다 |
+| "웹 스크래핑 해줘" | 수집은 1주차 담당입니다 |
+| "성분표 가져와줘" | 수집은 1주차 담당입니다 |
+| "UI 화면 만들어줘" | UI는 3주차 담당입니다 |
+| "차트 그려줘" | 시각화는 3주차 담당입니다 |
+| 함수 이름 바꾸기 | `analyze_product` 이름 고정입니다 |
+| trust_level에 다른 값 넣기 | 반드시 'high', 'medium', 'low' 중 하나 |
+| OpenAI/GPT 사용하기 | **Claude(Anthropic)를 사용해야 합니다!** |
+
+---
+
+## 여기까지만 하세요 (작업 범위)
+
+**성분 분석:**
+- [x] 성분표 분석 (좋은 성분 / 주의 성분 구분)
+- [x] 일일 권장량 대비 함량 적정성 평가
+
+**리뷰 분석:**
+- [x] 광고성 리뷰 판별 로직
+- [x] 신뢰도 점수 계산 (0~100)
+- [x] 신뢰도 등급 분류 (high/medium/low)
+
+**AI 분석:**
+- [x] Claude API로 약사 관점 분석
+- [x] 성분 + 리뷰 통합 분석
+- [x] 결과를 정해진 형식으로 반환
+
+---
+
+## API 키 설정 방법
+
+프로젝트 폴더에 `.env` 파일을 만들고:
+```
+ANTHROPIC_API_KEY=sk-ant-여기에키입력
+```
+
+**주의: OpenAI 키가 아닙니다! Anthropic 키입니다!**
+
+Anthropic API 키 발급: https://console.anthropic.com/
+
+Claude에게 이렇게 말하세요:
+```
+".env 파일에서 ANTHROPIC_API_KEY를 읽어서 사용하도록 해줘.
+절대 코드에 API 키를 직접 쓰지 마."
+```
+
+---
+
+## 완료 체크리스트
+
+작업이 끝나면 이것만 확인해주세요:
+
+```
+Claude에게 이렇게 물어보세요:
+
+"analyze_product 함수 테스트해줘.
+
+결과에서 확인할 것:
+1. trust_score가 0~100 사이 숫자인지
+2. trust_level이 'high', 'medium', 'low' 중 하나인지
+3. ai_result 안에 summary, efficacy, side_effects,
+   recommendations, trust_assessment, warnings,
+   ingredient_analysis가 다 있는지
+4. ingredient_analysis 안에 good_ingredients,
+   caution_ingredients, daily_value_assessment가 있는지
+5. 리스트 항목들이 None이 아니라 []라도 있는지"
+```
+
+---
+
+## 문제가 생기면
+
+```
+"에러가 나는데 고쳐줘" 라고 하면 Claude가 알아서 고칩니다.
+단, 위의 함수 이름과 반환 형식은 바꾸지 말라고 꼭 말해주세요.
+```
+
+---
+
+## 폴더 구조 (참고용)
+
+완성되면 대략 이런 모습이에요:
+```
+logic_designer/
+├── __init__.py      ← analyze_product 함수가 여기서 나와야 함
+├── checklist.py     ← 체크리스트 로직
+├── trust_score.py   ← 신뢰도 계산
+├── ai_analyzer.py   ← Claude 분석
+└── (기타 파일들)
+```

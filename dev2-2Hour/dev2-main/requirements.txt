@@ -1,0 +1,15 @@
+# 건기식 리뷰 팩트체크 엔진 필수 패키지
+
+# Anthropic Claude API
+anthropic>=0.40.0
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# LangChain 관련 패키지
+langchain-core>=0.3.0
+langchain-anthropic>=0.3.0
+pydantic>=2.0.0
+
+# Supabase 클라이언트
+supabase>=2.0.0
