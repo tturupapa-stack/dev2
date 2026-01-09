@@ -1,0 +1,30 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository Overview
+
+This is a team project repository with a focus on collaborative development using AI assistance. The repository includes Korean-language logging systems to track development progress and maintain communication between team members and AI assistants.
+
+## Project Logging System
+
+The repository uses three mandatory log files located in the `logs/` directory:
+
+1. **dev_log.md** (개발일지): Documents problems being solved, design intentions, and progress status
+2. **prompt_log.md** (프롬프트일지): Records commands/prompts given to AI assistants and their feedback/results
+3. **output_review.md** (결과값 검토): Tracks generated code/features, functionality verification, and alignment with project requirements
+
+When working on this project:
+- Update the appropriate log files when making significant changes or decisions
+- Use the YYYY-MM-DD date format for log entries
+- Document design rationale in dev_log.md
+- Record AI interactions in prompt_log.md for team transparency
+- Review outputs against requirements in output_review.md
+
+## Development Workflow
+
+This repository follows a structured workflow:
+1. Document the problem and design intent in dev_log.md
+2. Record prompts/commands used in prompt_log.md
+3. After implementation, verify the output in output_review.md
+4. Check: Does it work? Does it match the requirements? What needs improvement?
