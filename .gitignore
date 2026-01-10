@@ -77,3 +77,8 @@ debug_iherb.png
 debug_axios.html
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# Data files
+data/
+*.csv
+!products_master.csv

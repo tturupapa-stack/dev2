@@ -1,0 +1,81 @@
+/* NodeJs 12 샘플 코드 */
+
+
+var request = require('request');
+
+var url = 'http://api.data.go.kr/openapi/tn_pubr_public_health_functional_food_nutrition_info_api';
+var queryParams = '?' + encodeURIComponent('serviceKey') + '=7ef00491041db425e0a8ab59aba911aa95484d2ebef66177c64450c197fa4155'; /* Service Key*/
+queryParams += '&' + encodeURIComponent('pageNo') + '=' + encodeURIComponent('0'); /* */
+queryParams += '&' + encodeURIComponent('numOfRows') + '=' + encodeURIComponent('100'); /* */
+queryParams += '&' + encodeURIComponent('type') + '=' + encodeURIComponent('xml'); /* */
+queryParams += '&' + encodeURIComponent('FOOD_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('DATA_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('TYPE_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_ORIGIN_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_ORIGIN_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV3_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV3_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV4_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV4_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV5_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV5_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV6_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV6_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV7_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_LV7_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('TYPE_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('NTRT_IGRD_PVSN_UNIT_AMNT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ENERC') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('WATER') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('PROT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FATCE') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ASH') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('CHOCDF') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('SUGAR') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FIBTG') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('CA') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FE') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('P') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('K') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('NAT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('VITA_RAE') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('RETOL') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('CARTB') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('THIA') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('RIBF') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('NIA') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('VITC') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('VITD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('CHOLE') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FASAT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FATRN') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('SRC_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('SRC_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ONETM_QNT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ONETM_QNT_WGHT_VOLM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ONETM_INTK_NMTM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('INTK_TRGT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('FOOD_WGHT') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('ITEM_MNFTR_RPT_NO') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('MFR_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('IMPT_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('DIST_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('IMPT_YN') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('COO_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('COO_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('DATA_PROD_CD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('DATA_PROD_NM') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('CRT_YMD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('DATA_CRTR_YMD') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('instt_code') + '=' + encodeURIComponent(''); /* */
+queryParams += '&' + encodeURIComponent('instt_nm') + '=' + encodeURIComponent(''); /* */
+
+request({
+    url: url + queryParams,
+    method: 'GET'
+}, function (error, response, body) {
+    //console.log('Status', response.statusCode);
+    //console.log('Headers', JSON.stringify(response.headers));
+    //console.log('Reponse received', body);
+});
