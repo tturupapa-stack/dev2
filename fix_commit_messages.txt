@@ -1,0 +1,6 @@
+fix: .gitignore merge conflict 해결
+docs: 프롬프트 파일에 구현 완료 요약 추가
+docs: 영양성분 DB 통합 구현 완료 보고서 작성
+feat: 영양성분 DB 통합 구현 - Phase 1, 2 완료
+chore: 테스트 파일, 목업 데이터 등 streamlit에 업로드하는 데 혼선을 주는 자료들 삭제
+feat: 영양성분 DB 통합 프롬프트 작성 및 예외 처리 가이드 추가
