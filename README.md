@@ -1,40 +1,40 @@
-# 건기식 리뷰 팩트체크 시스템
+# Health Functional Food Review Fact-Check System
 
-건강기능식품 제품의 온라인 리뷰를 수집하고, AI를 활용하여 광고성 리뷰를 판별하며, 약사의 시각으로 분석 결과를 제공하는 웹 서비스 프로토타입입니다.
+A web service prototype that collects online reviews of health functional food products, uses AI to identify advertising reviews, and provides analysis results from a pharmacist's perspective.
 
-## 📖 프로젝트 소개
+## 📖 Project Introduction
 
-이 프로젝트는 iHerb에서 수집한 루테인 제품 5종의 리뷰 데이터를 분석하여:
-- **광고성 리뷰 판별**: 13단계 체크리스트 기반 자동 검증
-- **신뢰도 점수 계산**: 정량적 평가 시스템
-- **AI 약사 분석**: Claude AI를 활용한 전문적인 인사이트 제공
-- **시각화 대시보드**: Streamlit 기반 인터랙티브 UI
+This project analyzes review data for 5 Lutein products collected from iHerb to:
+- **Ad Review Detection**: Automatic verification based on 13-step checklist
+- **Trust Score Calculation**: Quantitative evaluation system
+- **AI Pharmacist Analysis**: Professional insights using Claude AI
+- **Visualization Dashboard**: Interactive UI based on Streamlit
 
-## 🏗️ 프로젝트 구조
+## 🏗️ Project Structure
 
 ```
 ica-github/
 ├── dev2-2Hour/
-│   └── dev2-main/          # 메인 프로젝트 폴더
-│       ├── docs/           # 프로젝트 문서
-│       ├── database/       # 데이터베이스 모듈
-│       ├── logic_designer/ # 로직 설계 및 AI 분석
+│   └── dev2-main/          # Main project folder
+│       ├── docs/           # Project documents
+│       ├── database/       # Database module
+│       ├── logic_designer/ # Logic design and AI analysis
 │       ├── ui_integration/ # Streamlit UI
-│       ├── data_manager/   # 데이터 수집 및 업로드
-│       └── 개발일지/       # 개발 일지
-└── README.md               # 이 파일
+│       ├── data_manager/   # Data collection and upload
+│       └── dev_logs/       # Development logs
+└── README.md               # This file
 ```
 
-## 🚀 빠른 시작
+## 🚀 Quick Start
 
-### 1. 저장소 클론
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/Siyeolryu/ica-github.git
 cd ica-github/dev2-2Hour/dev2-main
 ```
 
-### 2. 의존성 설치
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -42,53 +42,53 @@ cd ui_integration
 pip install -r requirements.txt
 ```
 
-### 3. 환경 변수 설정
+### 3. Environment Variables
 
-`.env` 파일을 생성하고 다음 내용을 추가:
+Create `.env` file and add:
 
 ```env
-# Supabase 설정
+# Supabase Settings
 SUPABASE_URL=https://bvowxbpqtfpkkxkzsumf.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# Anthropic Claude API (선택사항)
+# Anthropic Claude API (Optional)
 ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 
-### 4. Streamlit 앱 실행
+### 4. Run Streamlit App
 
 ```bash
 cd ui_integration
 streamlit run app.py
 ```
 
-## 📚 주요 기능
+## 📚 Main Features
 
-### 1. 신뢰도 검증 엔진
-- 13단계 광고 판별 체크리스트
-- 정량적 신뢰도 점수 계산 (0-100)
-- 자동 광고 리뷰 감지
+### 1. Trust Score Verification Engine
+- 13-step ad detection checklist
+- Quantitative trust score calculation (0-100)
+- Automatic ad review detection
 
-### 2. AI 약사 분석
-- Claude AI 기반 전문 분석
-- 효능, 부작용, 조언 제공
-- 할루시네이션 방지 로직
+### 2. AI Pharmacist Analysis
+- Claude AI-based professional analysis
+- Efficacy, side effects, advice provision
+- Hallucination prevention logic
 
-### 3. 시각화 대시보드
-- 신뢰도 게이지 차트
-- 레이더 차트 (5개 지표 비교)
-- 가격 비교 바 차트
-- 리뷰 상세 보기
+### 3. Visualization Dashboard
+- Trust score gauge chart
+- Radar chart (5 indicator comparison)
+- Price comparison bar chart
+- Review detail view
 
-## 📖 상세 문서
+## 📖 Detailed Documentation
 
-프로젝트의 상세한 문서는 `dev2-2Hour/dev2-main/docs/` 폴더를 참조하세요:
+For detailed project documentation, refer to `dev2-2Hour/dev2-main/docs/` folder:
 
-- [프로젝트 전체 개요](dev2-2Hour/dev2-main/docs/프로젝트_전체_개요.md)
-- [팀원 협업 가이드](dev2-2Hour/dev2-main/docs/팀원_협업_가이드_1주차.md)
-- [사용자 시나리오](dev2-2Hour/dev2-main/docs/사용자_시나리오.md)
+- [Project Overview](dev2-2Hour/dev2-main/docs/project-overview.md)
+- [Team Collaboration Guide](dev2-2Hour/dev2-main/docs/team-collaboration-guide-week1.md)
+- [User Scenario](dev2-2Hour/dev2-main/docs/user-scenario.md)
 
-## 🛠️ 기술 스택
+## 🛠️ Technology Stack
 
 - **Database**: Supabase (PostgreSQL)
 - **AI Analysis**: Anthropic Claude API
@@ -96,19 +96,19 @@ streamlit run app.py
 - **Visualization**: Plotly
 - **Language**: Python 3.8+
 
-## 📝 개발 일지
+## 📝 Development Logs
 
-프로젝트의 개발 과정은 `dev2-2Hour/dev2-main/개발일지/` 폴더에서 확인할 수 있습니다.
+Project development process can be found in `dev2-2Hour/dev2-main/dev_logs/` folder.
 
-## 🤝 기여하기
+## 🤝 Contributing
 
-이 프로젝트는 팀 프로젝트입니다. 기여를 원하시면 이슈를 생성하거나 Pull Request를 제출해주세요.
+This is a team project. To contribute, please create an issue or submit a Pull Request.
 
-## 📄 라이선스
+## 📄 License
 
-이 프로젝트는 교육 목적으로 제작되었습니다.
+This project is created for educational purposes.
 
-## 🔗 관련 링크
+## 🔗 Related Links
 
 - [Supabase Dashboard](https://supabase.com/dashboard/project/bvowxbpqtfpkkxkzsumf)
 - [Streamlit Cloud](https://streamlit.io/cloud)

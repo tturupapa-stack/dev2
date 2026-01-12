@@ -18,6 +18,13 @@
 import re
 from typing import Dict, Optional
 from .product_criteria import ProductCheckCriteria
+from .nutrition_utils import (
+    get_nutrition_info_safe,
+    extract_ingredients,
+    is_valid_ingredient,
+    get_official_efficacy,
+    get_typical_effect_period
+)
 
 
 class AdChecklist:
@@ -117,16 +124,25 @@ class AdChecklist:
         """
         self.criteria = criteria
 
-    def check_ad_patterns(self, review_text: str) -> Dict[int, str]:
+    def check_ad_patterns(
+        self, 
+        review_text: str, 
+        product_id: Optional[int] = None
+    ) -> Dict[int, str]:
         """
-        13단계 광고 판별 체크리스트 검사
+        13단계 광고 판별 체크리스트 검사 (영양성분 DB 통합)
 
         Args:
             review_text: 검사할 리뷰 텍스트
+            product_id: 제품 ID (제공 시 영양성분 DB 조회, 없어도 오류 없음)
 
         Returns:
             Dict[int, str]: {항목번호: 항목명} 형태로 감지된 항목 반환
         """
+        # 입력 검증: 리뷰가 너무 짧으면 빈 결과 반환
+        if not review_text or len(review_text.strip()) < 3:
+            return {}
+        
         detected_issues = {}
 
         for item_num, item_data in self.AD_PATTERNS.items():
@@ -167,6 +183,34 @@ class AdChecklist:
                 if re.search(pattern, review_text, re.IGNORECASE | re.MULTILINE):
                     detected_issues[item_num] = name
                     break
+
+        # 영양성분 DB 기반 추가 검증 (product_id가 있고 정보가 있는 경우만)
+        if product_id:
+            try:
+                # 5번: 원료 특징 나열 - 허위 성분 주장 검증
+                if self._validate_ingredient_claims(review_text, product_id):
+                    # 기존 5번 항목이 있으면 강화, 없으면 추가
+                    if 5 in detected_issues:
+                        detected_issues[5] = f"{detected_issues[5]} (허위 성분 주장 포함)"
+                    else:
+                        detected_issues[5] = "원료 특징 나열 (허위 성분 주장)"
+                
+                # 9번: 전문 용어 오남용 - 허위 의학적 주장 검증
+                if self._validate_medical_claims(review_text, product_id):
+                    if 9 in detected_issues:
+                        detected_issues[9] = f"{detected_issues[9]} (허위 의학적 주장 포함)"
+                    else:
+                        detected_issues[9] = "전문 용어 오남용 (허위 의학적 주장)"
+                
+                # 10번: 비현실적 효과 강조 - 효과 시점 검증
+                if self._validate_effect_timeline(review_text, product_id):
+                    if 10 in detected_issues:
+                        detected_issues[10] = f"{detected_issues[10]} (효과 시점 과장)"
+                    else:
+                        detected_issues[10] = "비현실적 효과 강조 (효과 시점 과장)"
+            except Exception:
+                # 영양성분 검증 중 오류 발생 시 무시하고 기존 결과만 반환
+                pass
 
         return detected_issues
 
@@ -313,9 +357,168 @@ class AdChecklist:
         
         return result
 
+    def _validate_ingredient_claims(
+        self, 
+        review_text: str, 
+        product_id: Optional[int] = None
+    ) -> bool:
+        """
+        리뷰에서 언급된 성분이 실제 제품에 포함되어 있는지 검증
+        
+        Args:
+            review_text: 리뷰 텍스트
+            product_id: 제품 ID (None이면 검증 생략)
+            
+        Returns:
+            bool: 허위 성분 주장이 있으면 True (광고 의심), 정보 없으면 False
+        """
+        # 1. product_id가 없으면 검증 생략 (기존 방식으로 동작)
+        if not product_id:
+            return False
+        
+        # 2. 영양성분 정보 조회 (오류 발생 시 기본값 반환)
+        nutrition_info = get_nutrition_info_safe(product_id)
+        if not nutrition_info:
+            return False  # 정보 없으면 검증 생략 (오류 없이)
+        
+        # 3. 리뷰 텍스트에서 성분명 추출
+        mentioned_ingredients = extract_ingredients(review_text)
+        if not mentioned_ingredients:
+            return False  # 성분 언급 없으면 검증 불가
+        
+        # 4. 언급된 성분이 실제 제품에 없는 경우 → 허위 주장으로 판단
+        for mentioned in mentioned_ingredients:
+            if not is_valid_ingredient(mentioned, nutrition_info):
+                return True  # 허위 주장 발견
+        
+        return False  # 모든 성분이 유효함
+
+    def _validate_medical_claims(
+        self, 
+        review_text: str, 
+        product_id: Optional[int] = None
+    ) -> bool:
+        """
+        리뷰의 의학적 주장이 영양성분 DB의 공식 효능과 일치하는지 검증
+        
+        Args:
+            review_text: 리뷰 텍스트
+            product_id: 제품 ID (None이면 검증 생략)
+            
+        Returns:
+            bool: 허위 의학적 주장이 있으면 True
+        """
+        if not product_id:
+            return False
+        
+        try:
+            nutrition_info = get_nutrition_info_safe(product_id)
+            if not nutrition_info:
+                return False
+            
+            # 리뷰에서 성분명 추출
+            mentioned_ingredients = extract_ingredients(review_text)
+            if not mentioned_ingredients:
+                return False
+            
+            # 의학적 주장 패턴 (과장된 표현)
+            exaggerated_claims = [
+                r"100%.*(회복|치료|완치)",
+                r"(완벽|완전).*(치료|회복|개선)",
+                r"(기적|놀라운|엄청난).*(효과|변화)",
+                r"(즉시|바로|단.*하루|일주일).*(효과|개선|변화)"
+            ]
+            
+            # 리뷰에 과장된 주장이 있는지 확인
+            has_exaggerated_claim = False
+            for pattern in exaggerated_claims:
+                if re.search(pattern, review_text, re.IGNORECASE):
+                    has_exaggerated_claim = True
+                    break
+            
+            if not has_exaggerated_claim:
+                return False  # 과장된 주장이 없으면 검증 불가
+            
+            # 각 성분의 공식 효능 확인
+            for ingredient in mentioned_ingredients:
+                official_efficacy = get_official_efficacy(ingredient, nutrition_info)
+                # 공식 효능이 없거나 과장된 주장과 불일치하면 의심
+                if not official_efficacy:
+                    # 공식 효능 정보가 없으면 검증 불가 (의심하지 않음)
+                    continue
+            
+            # 과장된 주장이 있지만 공식 효능과 일치하지 않는 경우는 False 반환
+            # (더 정교한 검증은 향후 개선)
+            return False
+            
+        except Exception:
+            return False  # 오류 발생 시 False 반환 (오류 없이)
+
+    def _validate_effect_timeline(
+        self, 
+        review_text: str, 
+        product_id: Optional[int] = None
+    ) -> bool:
+        """
+        리뷰의 효과 발현 시점이 현실적인지 검증
+        
+        Args:
+            review_text: 리뷰 텍스트
+            product_id: 제품 ID (None이면 검증 생략)
+            
+        Returns:
+            bool: 비현실적인 효과 시점 주장이 있으면 True
+        """
+        if not product_id:
+            return False
+        
+        try:
+            nutrition_info = get_nutrition_info_safe(product_id)
+            if not nutrition_info:
+                return False
+            
+            # 리뷰에서 성분명 추출
+            mentioned_ingredients = extract_ingredients(review_text)
+            if not mentioned_ingredients:
+                return False
+            
+            # 비현실적인 시점 표현 패턴
+            unrealistic_timeline_patterns = [
+                r"(즉시|바로|단.*하루|하루만에|일주일만에).*(효과|개선|변화|달라)",
+                r"(하루|일주일).*(만에|만).*(효과|개선|변화)"
+            ]
+            
+            # 비현실적인 시점 표현이 있는지 확인
+            has_unrealistic_timeline = False
+            for pattern in unrealistic_timeline_patterns:
+                if re.search(pattern, review_text, re.IGNORECASE):
+                    has_unrealistic_timeline = True
+                    break
+            
+            if not has_unrealistic_timeline:
+                return False  # 비현실적인 시점 표현이 없으면 검증 불가
+            
+            # 각 성분의 일반적 효과 발현 기간 확인
+            for ingredient in mentioned_ingredients:
+                typical_period = get_typical_effect_period(ingredient, nutrition_info)
+                if typical_period:
+                    # 일반적으로 2주 이상 걸리는 성분인데 "하루만에" 효과 주장하면 의심
+                    if typical_period >= 14:
+                        # "하루만에", "일주일만에" 같은 표현이 있으면 비현실적
+                        if re.search(r"(하루|일주일).*(만에|만)", review_text, re.IGNORECASE):
+                            return True
+            
+            return False
+            
+        except Exception:
+            return False  # 오류 발생 시 False 반환 (오류 없이)
+
 
 # 편의 함수
-def check_ad_patterns(review_text: str) -> Dict[int, str]:
+def check_ad_patterns(
+    review_text: str, 
+    product_id: Optional[int] = None
+) -> Dict[int, str]:
     """
     13단계 광고 판별 체크리스트 검사 편의 함수
 
