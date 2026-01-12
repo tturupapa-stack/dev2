@@ -235,43 +235,43 @@ def main():
                     continue
                 
                 with cols[idx]:
-                # 순위 배지 표시 (안전한 방식)
-                rank_badge = rank_badges.get(idx, "")
-                st.markdown(
-                    f'<div style="text-align: center; font-size: 36px; margin-bottom: 10px;">{rank_badge}</div>',
-                    unsafe_allow_html=True
-                )
+                    # 순위 배지 표시 (안전한 방식)
+                    rank_badge = rank_badges.get(idx, "")
+                    st.markdown(
+                        f'<div style="text-align: center; font-size: 36px; margin-bottom: 10px;">{rank_badge}</div>',
+                        unsafe_allow_html=True
+                    )
 
-                # 제품 정보 (이스케이프 처리)
-                brand = sanitize_user_input(product.get('brand', ''))
-                name = sanitize_user_input(product.get('name', ''))
-                price = product.get('price', 0)
-                
-                st.markdown(f"**{brand}**")
-                st.markdown(f"<small>{name}</small>", unsafe_allow_html=True)
-                
-                # 가격 검증
-                try:
-                    price_val = float(price)
-                    st.markdown(f"<span style='color: #3b82f6; font-size: 18px; font-weight: bold;'>${price_val:.2f}</span>", unsafe_allow_html=True)
-                except (TypeError, ValueError):
-                    st.markdown("<span style='color: #6b7280;'>가격 정보 없음</span>", unsafe_allow_html=True)
+                    # 제품 정보 (이스케이프 처리)
+                    brand = sanitize_user_input(product.get('brand', ''))
+                    name = sanitize_user_input(product.get('name', ''))
+                    price = product.get('price', 0)
+                    
+                    st.markdown(f"**{brand}**")
+                    st.markdown(f"<small>{name}</small>", unsafe_allow_html=True)
+                    
+                    # 가격 검증
+                    try:
+                        price_val = float(price)
+                        st.markdown(f"<span style='color: #3b82f6; font-size: 18px; font-weight: bold;'>${price_val:.2f}</span>", unsafe_allow_html=True)
+                    except (TypeError, ValueError):
+                        st.markdown("<span style='color: #6b7280;'>가격 정보 없음</span>", unsafe_allow_html=True)
 
-                # 신뢰도 게이지
-                try:
-                    trust_score = validate_score(ai_result.get("trust_score", 50), 0, 100)
-                    fig_gauge = render_gauge_chart(trust_score, "신뢰도")
-                    st.plotly_chart(fig_gauge, key=f"gauge_{product.get('id', idx)}")
-                except Exception as e:
-                    st.error(f"차트 생성 실패: {str(e)}")
+                    # 신뢰도 게이지
+                    try:
+                        trust_score = validate_score(ai_result.get("trust_score", 50), 0, 100)
+                        fig_gauge = render_gauge_chart(trust_score, "신뢰도")
+                        st.plotly_chart(fig_gauge, key=f"gauge_{product.get('id', idx)}")
+                    except Exception as e:
+                        st.error(f"차트 생성 실패: {str(e)}")
 
-                # 신뢰도 배지 (안전한 렌더링)
-                try:
-                    trust_level = ai_result.get("trust_level", "medium")
-                    badge_html = safe_render_html(render_trust_badge(trust_level))
-                    st.markdown(badge_html, unsafe_allow_html=True)
-                except Exception:
-                    pass  # 배지 렌더링 실패 시 무시
+                    # 신뢰도 배지 (안전한 렌더링)
+                    try:
+                        trust_level = ai_result.get("trust_level", "medium")
+                        badge_html = safe_render_html(render_trust_badge(trust_level))
+                        st.markdown(badge_html, unsafe_allow_html=True)
+                    except Exception:
+                        pass  # 배지 렌더링 실패 시 무시
             except Exception as e:
                 st.error(f"제품 정보 표시 중 오류: {str(e)}")
                 continue
