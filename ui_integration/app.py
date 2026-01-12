@@ -5,41 +5,44 @@
 
 import streamlit as st
 import pandas as pd
-import sys
 import os
 from typing import Dict, List, Optional
 
-# 상위 디렉토리를 경로에 추가하여 supabase_data 모듈 import 가능하게 함
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-try:
-    # Supabase 연동 시도
-    from supabase_data import get_all_analysis_results, get_all_products, search_products
-    USE_SUPABASE = True
-except (ImportError, Exception) as e:
-    # Supabase 연동 실패 시 mock_data 사용
-    from mock_data import get_all_analysis_results, get_all_products, search_products
-    USE_SUPABASE = False
-    if hasattr(st, 'warning'):
-        st.warning("⚠️ Supabase 연동 실패: 목업 데이터를 사용합니다.")
-
-from visualizations import (
-    render_gauge_chart,
-    render_trust_badge,
-    render_comparison_table,
-    render_radar_chart,
-    render_review_sentiment_chart,
-    render_checklist_visual,
-    render_price_comparison_chart
-)
-
-# 페이지 설정
+# 페이지 설정을 먼저 실행 (Streamlit 초기화)
 st.set_page_config(
     page_title="건기식 리뷰 팩트체크",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# 이후 모듈 import (같은 디렉토리에서 직접 import)
+try:
+    from supabase_data import get_all_analysis_results, get_all_products, search_products
+    USE_SUPABASE = True
+except (ImportError, Exception) as e:
+    import traceback
+    print(f"[ERROR] Supabase import failed: {e}")
+    print(traceback.format_exc())
+    from mock_data import get_all_analysis_results, get_all_products, search_products
+    USE_SUPABASE = False
+
+try:
+    from visualizations import (
+        render_gauge_chart,
+        render_trust_badge,
+        render_comparison_table,
+        render_radar_chart,
+        render_review_sentiment_chart,
+        render_checklist_visual,
+        render_price_comparison_chart
+    )
+except ImportError as e:
+    import traceback
+    st.error(f"Visualizations import failed: {e}")
+    print(f"[ERROR] Visualizations import failed: {e}")
+    print(traceback.format_exc())
+    raise
 
 # 커스텀 CSS
 st.markdown("""
