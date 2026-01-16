@@ -8,8 +8,8 @@ import os
 import requests
 from typing import Dict, List, Optional
 
-# 디버그 모드
-DEBUG = True
+# 디버그 모드 (사용자 UI에서 숨김)
+DEBUG = False
 
 def _get_config():
     """Streamlit secrets 또는 환경 변수에서 Supabase 설정 가져오기"""
@@ -25,13 +25,8 @@ def _get_config():
                 supabase_url = st.secrets['SUPABASE_URL']
                 supabase_key = st.secrets.get('SUPABASE_ANON_KEY')
                 source = "streamlit_secrets"
-                if DEBUG:
-                    st.sidebar.write(f"Config source: {source}")
-                    st.sidebar.write(f"URL loaded: {'Yes' if supabase_url else 'No'}")
-                    st.sidebar.write(f"Key loaded: {'Yes' if supabase_key else 'No'}")
     except Exception as e:
-        if DEBUG:
-            print(f"Streamlit secrets error: {e}")
+        pass  # 디버그 메시지 제거
 
     # 2. 환경 변수에서 시도 (secrets가 없는 경우)
     if not supabase_url:
@@ -45,11 +40,6 @@ def _get_config():
         supabase_key = os.getenv('SUPABASE_ANON_KEY')
         if supabase_url:
             source = "env_vars"
-
-    if DEBUG:
-        print(f"[DEBUG] Config source: {source}")
-        print(f"[DEBUG] SUPABASE_URL: {supabase_url[:50] if supabase_url else 'None'}...")
-        print(f"[DEBUG] SUPABASE_KEY: {'Set' if supabase_key else 'None'}")
 
     return supabase_url, supabase_key
 

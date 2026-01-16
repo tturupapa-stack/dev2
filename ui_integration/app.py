@@ -163,20 +163,23 @@ def get_active_filters_summary(filters: Dict, all_products_list: List[Dict]) -> 
     
     return active_filters
 
-def reset_all_filters(all_products_list: List[Dict], categories: List[str], brands: List[str]):
+def reset_all_filters(all_products_list: List[Dict], categories: Optional[List[str]], brands: Optional[List[str]]):
     """모든 필터를 초기 상태로 리셋"""
-    # 초기값 설정
-    if categories:
+    # 안전한 초기값 설정
+    # categories 처리: None 체크 및 리스트 타입 확인
+    if categories is not None and isinstance(categories, list) and len(categories) > 0:
         st.session_state.category_filter = categories.copy()
     else:
         st.session_state.category_filter = []
     
-    if brands:
+    # brands 처리: None 체크 및 리스트 타입 확인
+    if brands is not None and isinstance(brands, list) and len(brands) > 0:
         st.session_state.brand_filter = brands.copy()
     else:
         st.session_state.brand_filter = []
     
-    if all_products_list:
+    # 가격 범위 초기화
+    if all_products_list and isinstance(all_products_list, list) and len(all_products_list) > 0:
         prices = [p.get("price", 0) for p in all_products_list if p.get("price") and p.get("price") > 0]
         if prices:
             st.session_state.price_range = (float(min(prices)), float(max(prices)))
@@ -189,13 +192,17 @@ def reset_all_filters(all_products_list: List[Dict], categories: List[str], bran
         if review_counts:
             st.session_state.review_count_range = (int(min(review_counts)), int(max(review_counts)))
     
+    # 기본 필터 값 설정
     st.session_state.trust_filter = ["HIGH", "MEDIUM", "LOW"]
+    
+    # 선택적 필터 초기화 (존재하는 경우에만)
     if 'search_query' in st.session_state:
         st.session_state.search_query = ""
     if 'review_start_date' in st.session_state:
         st.session_state.review_start_date = None
     if 'review_end_date' in st.session_state:
         st.session_state.review_end_date = None
+    
     st.session_state.language_filter = ["all"]
 
 try:
@@ -689,9 +696,9 @@ def main():
     product_options = {f"{v['product']['brand']} {v['product']['name']}": k for k, v in all_data.items()}
     
     # 캐싱된 제품 목록 및 카테고리 가져오기 (성능 최적화)
-    all_products_list = get_cached_products()
-    categories = get_cached_categories()
-    brands = sorted(list(set(p.get("brand", "") for p in all_products_list if p.get("brand"))))
+    all_products_list = get_cached_products() or []
+    categories = get_cached_categories() or []
+    brands = sorted(list(set(p.get("brand", "") for p in all_products_list if p.get("brand") and p.get("brand")))) if all_products_list else []
     
     # ========== 사이드바: 개선된 탭 구조 ==========
     with st.sidebar:
@@ -774,8 +781,9 @@ def main():
             else:
                 category_filter = []
             
-            # 브랜드 필터
-            brands = sorted(list(set(p.get("brand", "") for p in all_products_list if p.get("brand"))))
+            # 브랜드 필터 (전역 brands 변수 사용, 없으면 재계산)
+            if not brands and all_products_list:
+                brands = sorted(list(set(p.get("brand", "") for p in all_products_list if p.get("brand") and p.get("brand"))))
             if brands:
                 brand_filter = st.multiselect(
                     "🏷️ 브랜드",
@@ -866,7 +874,11 @@ def main():
             col_reset, col_save = st.columns(2)
             with col_reset:
                 if st.button("🔄 초기화", use_container_width=True, type="secondary", key="reset_filters"):
-                    reset_all_filters(all_products_list, categories, brands)
+                    # 안전한 초기화: None 체크 후 전달
+                    safe_categories = categories if (categories is not None and isinstance(categories, list)) else []
+                    safe_brands = brands if (brands is not None and isinstance(brands, list)) else []
+                    safe_products = all_products_list if (all_products_list is not None and isinstance(all_products_list, list)) else []
+                    reset_all_filters(safe_products, safe_categories, safe_brands)
                     st.rerun()
             with col_save:
                 if st.button("💾 저장", use_container_width=True, type="secondary", key="save_filters"):
@@ -1144,7 +1156,59 @@ def main():
     # 탭 1: 종합 비교 분석
     with tab1:
         st.markdown('<div class="section-header">📊 모든 제품 한눈에 비교</div>', unsafe_allow_html=True)
-        
+
+        # ========== Quick Win #1: Hero Metrics - 핵심 지표 최상단 ==========
+        st.markdown("### 🎯 핵심 지표 한눈에")
+        hero_cols = st.columns(len(selected_data))
+        for idx, data in enumerate(selected_data):
+            product = data.get("product", {})
+            ai_result = data.get("ai_result", {})
+            reviews = data.get("reviews", [])
+            trust_score = ai_result.get("trust_score", 0)
+
+            # 색상 결정
+            if trust_score >= 70:
+                color = "#22c55e"
+                bg_color = "#dcfce7"
+                status = "✅ 신뢰"
+            elif trust_score >= 50:
+                color = "#f59e0b"
+                bg_color = "#fef3c7"
+                status = "⚠️ 주의"
+            else:
+                color = "#ef4444"
+                bg_color = "#fee2e2"
+                status = "❌ 위험"
+
+            with hero_cols[idx]:
+                st.markdown(f"""
+                <div style="background: {bg_color}; border-radius: 12px; padding: 1.5rem; text-align: center; border: 2px solid {color};">
+                    <p style="font-size: 0.9rem; color: #525252; margin: 0;">{product.get('brand', '')}</p>
+                    <p style="font-size: 3.5rem; font-weight: 700; color: {color}; margin: 0.5rem 0; line-height: 1;">
+                        {trust_score:.0f}
+                    </p>
+                    <p style="font-size: 1rem; color: #737373; margin: 0;">/ 100점</p>
+                    <p style="font-size: 1.1rem; font-weight: 600; color: {color}; margin-top: 0.5rem;">{status}</p>
+                    <hr style="margin: 1rem 0; border-color: {color}30;">
+                    <div style="display: flex; justify-content: space-around;">
+                        <div>
+                            <p style="font-size: 1.2rem; font-weight: 600; margin: 0;">${product.get('price', 0):.2f}</p>
+                            <p style="font-size: 0.75rem; color: #737373; margin: 0;">가격</p>
+                        </div>
+                        <div>
+                            <p style="font-size: 1.2rem; font-weight: 600; margin: 0;">{len(reviews)}</p>
+                            <p style="font-size: 0.75rem; color: #737373; margin: 0;">리뷰</p>
+                        </div>
+                        <div>
+                            <p style="font-size: 1.2rem; font-weight: 600; margin: 0;">{sum(r.get('rating', 0) for r in reviews) / len(reviews) if reviews else 0:.1f}★</p>
+                            <p style="font-size: 0.75rem; color: #737373; margin: 0;">평점</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         # 레이더 차트와 가격 비교를 더 크게 표시
         col1, col2 = st.columns([1.5, 1])
         with col1:
@@ -1173,8 +1237,47 @@ def main():
                 st.progress(trust_score / 100, text=f"{trust_score:.1f}점")
         
         st.markdown("#### 📋 세부 지표 비교표")
+
+        # ========== Quick Win #2: 테이블 정렬 기능 ==========
+        sort_col1, sort_col2 = st.columns([1, 3])
+        with sort_col1:
+            sort_by = st.selectbox(
+                "정렬 기준",
+                ["신뢰도 높은순", "신뢰도 낮은순", "가격 낮은순", "가격 높은순", "리뷰 많은순", "평점 높은순"],
+                key="table_sort"
+            )
+
         comparison_df = render_comparison_table(selected_data)
-        st.dataframe(comparison_df, use_container_width=True, hide_index=True, height=400)
+
+        # 정렬 적용
+        sort_map = {
+            "신뢰도 높은순": ("신뢰도", False),
+            "신뢰도 낮은순": ("신뢰도", True),
+            "가격 낮은순": ("가격 ($)", True),
+            "가격 높은순": ("가격 ($)", False),
+            "리뷰 많은순": ("리뷰 수", False),
+            "평점 높은순": ("평균 평점", False)
+        }
+        sort_column, ascending = sort_map.get(sort_by, ("신뢰도", False))
+
+        # 숫자로 변환하여 정렬
+        comparison_df["_sort_key"] = comparison_df[sort_column].apply(
+            lambda x: float(str(x).replace("$", "").replace("개", "").replace("/5", "").replace("%", "").strip())
+        )
+        comparison_df = comparison_df.sort_values("_sort_key", ascending=ascending).drop(columns=["_sort_key"])
+
+        # ========== Quick Win #3: 신뢰도별 행 배경색 ==========
+        def highlight_trust_row(row):
+            trust_val = float(str(row["신뢰도"]).replace("점", "").strip())
+            if trust_val >= 70:
+                return ['background-color: #dcfce7'] * len(row)
+            elif trust_val >= 50:
+                return ['background-color: #fef3c7'] * len(row)
+            else:
+                return ['background-color: #fee2e2'] * len(row)
+
+        styled_df = comparison_df.style.apply(highlight_trust_row, axis=1)
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=400)
     
     # 탭 2: AI 제품별 정밀 진단
     with tab2:
@@ -1302,13 +1405,23 @@ def main():
         
         # 제품별 상세 통계 테이블
         st.markdown("#### 📊 제품별 상세 통계")
+
+        # 정렬 기능
+        stat_sort_col1, stat_sort_col2 = st.columns([1, 3])
+        with stat_sort_col1:
+            stat_sort_by = st.selectbox(
+                "정렬 기준",
+                ["신뢰도 높은순", "가격 낮은순", "리뷰 많은순", "재구매율 높은순"],
+                key="stat_table_sort"
+            )
+
         stats_data = []
         for data in selected_data:
             product = data.get("product", {})
             ai_result = data.get("ai_result", {})
             reviews = data.get("reviews", [])
             checklist = data.get("checklist_results", {})
-            
+
             stats_data.append({
                 "제품명": f"{product.get('brand', '')} {product.get('name', '')}",
                 "가격 ($)": product.get("price", 0),
@@ -1320,9 +1433,38 @@ def main():
                 "재구매율": checklist.get("2_reorder_rate", {}).get("rate", 0) * 100,
                 "장기 사용 비율": checklist.get("3_long_term_use", {}).get("rate", 0) * 100,
             })
-        
+
         stats_df = pd.DataFrame(stats_data)
-        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+
+        # 정렬 적용
+        stat_sort_map = {
+            "신뢰도 높은순": ("신뢰도 점수", False),
+            "가격 낮은순": ("가격 ($)", True),
+            "리뷰 많은순": ("리뷰 수", False),
+            "재구매율 높은순": ("재구매율", False)
+        }
+        stat_sort_column, stat_ascending = stat_sort_map.get(stat_sort_by, ("신뢰도 점수", False))
+        stats_df = stats_df.sort_values(stat_sort_column, ascending=stat_ascending)
+
+        # 신뢰도별 행 배경색
+        def highlight_stat_row(row):
+            trust_val = row["신뢰도 점수"]
+            if trust_val >= 70:
+                return ['background-color: #dcfce7'] * len(row)
+            elif trust_val >= 50:
+                return ['background-color: #fef3c7'] * len(row)
+            else:
+                return ['background-color: #fee2e2'] * len(row)
+
+        styled_stats_df = stats_df.style.apply(highlight_stat_row, axis=1).format({
+            "가격 ($)": "${:.2f}",
+            "신뢰도 점수": "{:.1f}",
+            "평균 평점": "{:.1f}",
+            "인증 구매 비율": "{:.1f}%",
+            "재구매율": "{:.1f}%",
+            "장기 사용 비율": "{:.1f}%"
+        })
+        st.dataframe(styled_stats_df, use_container_width=True, hide_index=True)
 
 
 if __name__ == "__main__":
